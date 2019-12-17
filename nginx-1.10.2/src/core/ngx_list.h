@@ -15,19 +15,19 @@
 
 typedef struct ngx_list_part_s  ngx_list_part_t;
 
-struct ngx_list_part_s {
-    void             *elts;
-    ngx_uint_t        nelts;
-    ngx_list_part_t  *next;
+struct ngx_list_part_s { // nginx 链表每个元素都是一片连续的内存，不区分类型
+    void             *elts; // 内存开始地址
+    ngx_uint_t        nelts; // 已经使用的内存数目
+    ngx_list_part_t  *next; // 下一个元素地址
 };
 
 
 typedef struct {
-    ngx_list_part_t  *last;
-    ngx_list_part_t   part;
-    size_t            size;
-    ngx_uint_t        nalloc;
-    ngx_pool_t       *pool;
+    ngx_list_part_t  *last; // 链表尾部
+    ngx_list_part_t   part; // 链表首部
+    size_t            size; // 每个ngx_list_part_s节点的大小
+    ngx_uint_t        nalloc; // n个ngx_list_part_s节点
+    ngx_pool_t       *pool; // 内存池
 } ngx_list_t;
 
 
