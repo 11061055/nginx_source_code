@@ -14,10 +14,10 @@
 
 
 typedef struct {
-    void        *elts;
-    ngx_uint_t   nelts;
-    size_t       size;
-    ngx_uint_t   nalloc;
+    void        *elts;   // 指向一片连续内存
+    ngx_uint_t   nelts;  // 已使用元素个数
+    size_t       size;   // 每个元素大小
+    ngx_uint_t   nalloc; // 最多保存多少个元素
     ngx_pool_t  *pool;
 } ngx_array_t;
 
@@ -29,7 +29,7 @@ void *ngx_array_push_n(ngx_array_t *a, ngx_uint_t n);
 
 
 static ngx_inline ngx_int_t
-ngx_array_init(ngx_array_t *array, ngx_pool_t *pool, ngx_uint_t n, size_t size)
+ngx_array_init(ngx_array_t *array, ngx_pool_t *pool, ngx_uint_t n, size_t size) // 申请一个数组，包含n个元素，每个元素大小size
 {
     /*
      * set "array->nelts" before "array->elts", otherwise MSVC thinks
@@ -41,7 +41,7 @@ ngx_array_init(ngx_array_t *array, ngx_pool_t *pool, ngx_uint_t n, size_t size)
     array->nalloc = n;
     array->pool = pool;
 
-    array->elts = ngx_palloc(pool, n * size);
+    array->elts = ngx_palloc(pool, n * size); //申请连续内存
     if (array->elts == NULL) {
         return NGX_ERROR;
     }
