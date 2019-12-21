@@ -36,7 +36,7 @@ ngx_queue_middle(ngx_queue_t *queue)
             return middle;
         }
 
-        next = ngx_queue_next(next);
+        next = ngx_queue_next(next); // next每次多移动一步
 
         if (next == ngx_queue_last(queue)) {
             return middle;
@@ -49,7 +49,7 @@ ngx_queue_middle(ngx_queue_t *queue)
 
 void
 ngx_queue_sort(ngx_queue_t *queue,
-    ngx_int_t (*cmp)(const ngx_queue_t *, const ngx_queue_t *))
+    ngx_int_t (*cmp)(const ngx_queue_t *, const ngx_queue_t *)) // 对 queue进行冒泡排序
 {
     ngx_queue_t  *q, *prev, *next;
 
