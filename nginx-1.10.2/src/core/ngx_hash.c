@@ -580,7 +580,7 @@ ngx_hash_wildcard_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names, //names参
         if (next_names.nelts) {
 
             h = *hinit; // 复制当前的结构
-            h.hash = NULL; // 这里很重要，当把这里置为NULL，递归结束层ngx_hash_init将留ngx_hash_wildcard_t大小的空间，而不止ngx_hash_t大小的空间
+            h.hash = NULL; // 这里很重要，当把这里置为NULL，递归结束层ngx_hash_init将留ngx_hash_wildcard_t大小的空间，而不止ngx_hash_t大小的空间 http://www.ishenping.com/ArtInfo/3595343.html
 
             if (ngx_hash_wildcard_init(&h, (ngx_hash_key_t *) next_names.elts, // 处理 二级 结构
                                        next_names.nelts)
