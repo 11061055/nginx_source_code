@@ -8,7 +8,10 @@
 #include <ngx_config.h>
 #include <ngx_core.h>
 
-
+// 共享内存的两种方式：
+// 1. MMAP 使得不同进程的读写直接操作内核空间数据
+// 2. shm方式使得不同进程的读写操作同一片内存空间
+// 3. 更多零拷贝技术：https://www.ibm.com/developerworks/cn/linux/l-cn-zerocopy2/index.html
 #if (NGX_HAVE_MAP_ANON)
 
 ngx_int_t
