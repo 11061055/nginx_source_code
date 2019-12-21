@@ -12,4 +12,6 @@
 
 3. 数组的注释：  https://github.com/11061055/nginx_source_code/commit/0fbb126c557b19ee57ec6e5d6caf540616a24b94
 
+4. 哈希的注释：  https://github.com/11061055/nginx_source_code/commit/a40b33b34bdc64b575539bfeddbbe42092f49de5
+
 
