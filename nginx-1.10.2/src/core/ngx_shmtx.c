@@ -30,7 +30,7 @@ ngx_shmtx_create(ngx_shmtx_t *mtx, ngx_shmtx_sh_t *addr, u_char *name)
 
     mtx->wait = &addr->wait;
 
-    if (sem_init(&mtx->sem, 1, 0) == -1) {
+    if (sem_init(&mtx->sem, 1, 0) == -1) { // 创建 进程间 共享的信号量
         ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, ngx_errno,
                       "sem_init() failed");
     } else {
@@ -75,13 +75,13 @@ ngx_shmtx_lock(ngx_shmtx_t *mtx)
 
     for ( ;; ) {
 
-        if (*mtx->lock == 0 && ngx_atomic_cmp_set(mtx->lock, 0, ngx_pid)) {
+        if (*mtx->lock == 0 && ngx_atomic_cmp_set(mtx->lock, 0, ngx_pid)) { // 锁成功
             return;
         }
 
-        if (ngx_ncpu > 1) {
+        if (ngx_ncpu > 1) { // CPU 个数大于1
 
-            for (n = 1; n < mtx->spin; n <<= 1) {
+            for (n = 1; n < mtx->spin; n <<= 1) { // 二进制 递增
 
                 for (i = 0; i < n; i++) {
                     ngx_cpu_pause();
@@ -95,7 +95,7 @@ ngx_shmtx_lock(ngx_shmtx_t *mtx)
             }
         }
 
-#if (NGX_HAVE_POSIX_SEM)
+#if (NGX_HAVE_POSIX_SEM) // 信号量与原子锁并用方式
 
         if (mtx->semaphore) {
             (void) ngx_atomic_fetch_add(mtx->wait, 1);
@@ -108,7 +108,7 @@ ngx_shmtx_lock(ngx_shmtx_t *mtx)
             ngx_log_debug1(NGX_LOG_DEBUG_CORE, ngx_cycle->log, 0,
                            "shmtx wait %uA", *mtx->wait);
 
-            while (sem_wait(&mtx->sem) == -1) {
+            while (sem_wait(&mtx->sem) == -1) { // 等信号量
                 ngx_err_t  err;
 
                 err = ngx_errno;
@@ -128,7 +128,7 @@ ngx_shmtx_lock(ngx_shmtx_t *mtx)
 
 #endif
 
-        ngx_sched_yield();
+        ngx_sched_yield(); // 释放所有圈
     }
 }
 
@@ -140,8 +140,8 @@ ngx_shmtx_unlock(ngx_shmtx_t *mtx)
         ngx_log_debug0(NGX_LOG_DEBUG_CORE, ngx_cycle->log, 0, "shmtx unlock");
     }
 
-    if (ngx_atomic_cmp_set(mtx->lock, ngx_pid, 0)) {
-        ngx_shmtx_wakeup(mtx);
+    if (ngx_atomic_cmp_set(mtx->lock, ngx_pid, 0)) { // 处理原子操作
+        ngx_shmtx_wakeup(mtx); // 信号量操作
     }
 }
 
@@ -171,7 +171,7 @@ ngx_shmtx_wakeup(ngx_shmtx_t *mtx)
         return;
     }
 
-    for ( ;; ) {
+    for ( ;; ) { // 在信号量通知的时候，先释放所有处于 wait 的进程
 
         wait = *mtx->wait;
 
@@ -187,7 +187,7 @@ ngx_shmtx_wakeup(ngx_shmtx_t *mtx)
     ngx_log_debug1(NGX_LOG_DEBUG_CORE, ngx_cycle->log, 0,
                    "shmtx wake %uA", wait);
 
-    if (sem_post(&mtx->sem) == -1) {
+    if (sem_post(&mtx->sem) == -1) { // 信号量加一
         ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, ngx_errno,
                       "sem_post() failed while wake shmtx");
     }
