@@ -74,14 +74,16 @@
 
 #define NGX_MAX_CONF_ERRSTR  1024
 
-
+// 用于存储模块定义的配置文件参数
+// 每解析到一个配置项
+// 会遍历所有模块的所有配置项，每个模块都以ngx_null_command结束
 struct ngx_command_s {
-    ngx_str_t             name;
-    ngx_uint_t            type;
-    char               *(*set)(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
-    ngx_uint_t            conf;
-    ngx_uint_t            offset;
-    void                 *post;
+    ngx_str_t             name; // 配置项的名称
+    ngx_uint_t            type; // 配置项可以出现的位置如server location 以及可以携带的参数个数
+    char               *(*set)(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);  // 检测到name配置项后，可以调用的处理方法
+    ngx_uint_t            conf; // 指定将解析的配置写入哪个结构 比如 是 HTTP 还是 SERVER 还是 LOCATION 所在 结构体
+    ngx_uint_t            offset; // 表示当前配置项所在的存储单元在整个结构体中的偏移
+    void                 *post; // 根据不同的set方法，该参数可以传递额外的数据
 };
 
 #define ngx_null_command  { ngx_null_string, 0, NULL, 0, 0, NULL }
@@ -113,10 +115,10 @@ typedef struct {
 typedef char *(*ngx_conf_handler_pt)(ngx_conf_t *cf,
     ngx_command_t *dummy, void *conf);
 
-
+// 用于保存nginx中解析到的指令，参见ngx_init_cycle
 struct ngx_conf_s {
     char                 *name;
-    ngx_array_t          *args;
+    ngx_array_t          *args; // 用户保存所有解析到的参数，参见ngx_conf_read_token
 
     ngx_cycle_t          *cycle;
     ngx_pool_t           *pool;
@@ -128,8 +130,8 @@ struct ngx_conf_s {
     ngx_uint_t            module_type;
     ngx_uint_t            cmd_type;
 
-    ngx_conf_handler_pt   handler;
-    char                 *handler_conf;
+    ngx_conf_handler_pt   handler; // 没解析到有token都会调用handler)(ngx_conf_t, NULL, ngx_conf_t->handler_conf)
+    char                 *handler_conf; // handler的第三个参数
 };
 
 

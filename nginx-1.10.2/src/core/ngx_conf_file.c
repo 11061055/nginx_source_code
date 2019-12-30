@@ -66,7 +66,7 @@ ngx_conf_param(ngx_conf_t *cf)
     ngx_buf_t         b;
     ngx_conf_file_t   conf_file;
 
-    param = &cf->cycle->conf_param;
+    param = &cf->cycle->conf_param; // conf_param 是 nginx 启动时 -g 参数指定的
 
     if (param->len == 0) {
         return NGX_CONF_OK;
@@ -89,14 +89,14 @@ ngx_conf_param(ngx_conf_t *cf)
     cf->conf_file = &conf_file;
     cf->conf_file->buffer = &b;
 
-    rv = ngx_conf_parse(cf, NULL);
+    rv = ngx_conf_parse(cf, NULL); // 解析配置文件
 
     cf->conf_file = NULL;
 
     return rv;
 }
 
-
+// 解析配置文件 ngx_init_cycle 函数中会调用，上面函数也会调用
 char *
 ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename)
 {
@@ -204,7 +204,7 @@ ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename)
 
 
     for ( ;; ) {
-        rc = ngx_conf_read_token(cf);
+        rc = ngx_conf_read_token(cf); // 读取一个配置项 保存在 ngx_conf_s 的 args 中，根据不同情况，可能有如下5种返回值
 
         /*
          * ngx_conf_read_token() may return
@@ -265,7 +265,7 @@ ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename)
                 goto failed;
             }
 
-            rv = (*cf->handler)(cf, NULL, cf->handler_conf);
+            rv = (*cf->handler)(cf, NULL, cf->handler_conf); // 根据ngx_conf_s中的handler处理解析到的配置项
             if (rv == NGX_CONF_OK) {
                 continue;
             }
@@ -317,7 +317,7 @@ done:
 
 
 static ngx_int_t
-ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last)
+ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last) // 每解析到一个配置项，都要遍历各个模块，查看各个模块的command数组中有没有该配置项
 {
     char           *rv;
     void           *conf, **confp;
@@ -329,10 +329,10 @@ ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last)
 
     found = 0;
 
-    for (i = 0; cf->cycle->modules[i]; i++) {
+    for (i = 0; cf->cycle->modules[i]; i++) { // 遍历所有模块
 
-        cmd = cf->cycle->modules[i]->commands;
-        if (cmd == NULL) {
+        cmd = cf->cycle->modules[i]->commands; // 取得该模块的commands
+        if (cmd == NULL) { // 各个模块的commands数组以null结尾
             continue;
         }
 
@@ -342,7 +342,7 @@ ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last)
                 continue;
             }
 
-            if (ngx_strcmp(name->data, cmd->name.data) != 0) {
+            if (ngx_strcmp(name->data, cmd->name.data) != 0) { // 找到一个模块有该配置项
                 continue;
             }
 
@@ -424,7 +424,7 @@ ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last)
                 }
             }
 
-            rv = cmd->set(cf, cmd, conf);
+            rv = cmd->set(cf, cmd, conf); // 调用该command结构中配置的set函数
 
             if (rv == NGX_CONF_OK) {
                 return NGX_OK;
@@ -462,7 +462,7 @@ invalid:
     return NGX_ERROR;
 }
 
-
+// 读取一个配置项，ngx_init_cycle中调用 上面函数也会调用，所有配置项会保存在ngx_conf_s中的args中
 static ngx_int_t
 ngx_conf_read_token(ngx_conf_t *cf)
 {
@@ -494,7 +494,7 @@ ngx_conf_read_token(ngx_conf_t *cf)
 
     for ( ;; ) {
 
-        if (b->pos >= b->last) {
+        if (b->pos >= b->last) { // 还有数据没处理完
 
             if (cf->conf_file->file.offset >= file_size) {
 
@@ -550,7 +550,7 @@ ngx_conf_read_token(ngx_conf_t *cf)
                 size = b->end - (b->start + len);
             }
 
-            n = ngx_read_file(&cf->conf_file->file, b->start + len, size,
+            n = ngx_read_file(&cf->conf_file->file, b->start + len, size, // 读取一段
                               cf->conf_file->file.offset);
 
             if (n == NGX_ERROR) {
@@ -715,13 +715,13 @@ ngx_conf_read_token(ngx_conf_t *cf)
                 found = 1;
             }
 
-            if (found) {
+            if (found) { // 找到一个配置项 保存到 ngx_conf_s 的 args 参数中
                 word = ngx_array_push(cf->args);
                 if (word == NULL) {
                     return NGX_ERROR;
                 }
 
-                word->data = ngx_pnalloc(cf->pool, b->pos - 1 - start + 1);
+                word->data = ngx_pnalloc(cf->pool, b->pos - 1 - start + 1); // 申请空间保存配置参数
                 if (word->data == NULL) {
                     return NGX_ERROR;
                 }
@@ -755,7 +755,7 @@ ngx_conf_read_token(ngx_conf_t *cf)
                         }
 
                     }
-                    *dst++ = *src++;
+                    *dst++ = *src++; // 保存配置参数
                 }
                 *dst = '\0';
                 word->len = len;
@@ -776,7 +776,7 @@ ngx_conf_read_token(ngx_conf_t *cf)
 
 
 char *
-ngx_conf_include(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+ngx_conf_include(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) // include 模式匹配文件 用于 上述 commands 数组中
 {
     char        *rv;
     ngx_int_t    n;
@@ -805,7 +805,7 @@ ngx_conf_include(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     gl.log = cf->log;
     gl.test = 1;
 
-    if (ngx_open_glob(&gl) != NGX_OK) {
+    if (ngx_open_glob(&gl) != NGX_OK) { // 调用系统函数 glob((char *) gl->pattern, 0, NULL, &gl->pglob); 进行模式匹配
         ngx_conf_log_error(NGX_LOG_EMERG, cf, ngx_errno,
                            ngx_open_glob_n " \"%s\" failed", file.data);
         return NGX_CONF_ERROR;
@@ -813,7 +813,7 @@ ngx_conf_include(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     rv = NGX_CONF_OK;
 
-    for ( ;; ) {
+    for ( ;; ) { // 按模式读取所有的配置文件
         n = ngx_read_glob(&gl, &name);
 
         if (n != NGX_OK) {
@@ -828,7 +828,7 @@ ngx_conf_include(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
         ngx_log_debug1(NGX_LOG_DEBUG_CORE, cf->log, 0, "include %s", file.data);
 
-        rv = ngx_conf_parse(cf, &file);
+        rv = ngx_conf_parse(cf, &file); // 并解析素有配置文件
 
         if (rv != NGX_CONF_OK) {
             break;
@@ -853,7 +853,7 @@ ngx_conf_full_name(ngx_cycle_t *cycle, ngx_str_t *name, ngx_uint_t conf_prefix)
 
 
 ngx_open_file_t *
-ngx_conf_open_file(ngx_cycle_t *cycle, ngx_str_t *name)
+ngx_conf_open_file(ngx_cycle_t *cycle, ngx_str_t *name) // 打开文件 如果文件已经打开则直接返回
 {
     ngx_str_t         full;
     ngx_uint_t        i;
@@ -871,7 +871,7 @@ ngx_conf_open_file(ngx_cycle_t *cycle, ngx_str_t *name)
             return NULL;
         }
 
-        part = &cycle->open_files.part;
+        part = &cycle->open_files.part; // 查找所有已经打开的文件
         file = part->elts;
 
         for (i = 0; /* void */ ; i++) {
@@ -889,13 +889,13 @@ ngx_conf_open_file(ngx_cycle_t *cycle, ngx_str_t *name)
                 continue;
             }
 
-            if (ngx_strcmp(full.data, file[i].name.data) == 0) {
+            if (ngx_strcmp(full.data, file[i].name.data) == 0) { // 找到已经打开的文件
                 return &file[i];
             }
         }
     }
 
-    file = ngx_list_push(&cycle->open_files);
+    file = ngx_list_push(&cycle->open_files); // 否则插入
     if (file == NULL) {
         return NULL;
     }
@@ -917,7 +917,7 @@ ngx_conf_open_file(ngx_cycle_t *cycle, ngx_str_t *name)
 
 
 static void
-ngx_conf_flush_files(ngx_cycle_t *cycle)
+ngx_conf_flush_files(ngx_cycle_t *cycle) // flush 所有已经打开的文件
 {
     ngx_uint_t        i;
     ngx_list_part_t  *part;
@@ -981,7 +981,7 @@ ngx_conf_log_error(ngx_uint_t level, ngx_conf_t *cf, ngx_err_t err,
 
 
 char *
-ngx_conf_set_flag_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+ngx_conf_set_flag_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) // 处理 on off 类型参数
 {
     char  *p = conf;
 
@@ -1011,7 +1011,7 @@ ngx_conf_set_flag_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    if (cmd->post) {
+    if (cmd->post) { // 对于 on off 类型参数 ngx_command_s 中的 post 是有含义的 保存的是 ngx_conf_post_t
         post = cmd->post;
         return post->post_handler(cf, post, fp);
     }
@@ -1021,7 +1021,7 @@ ngx_conf_set_flag_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 
 char *
-ngx_conf_set_str_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+ngx_conf_set_str_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) // 处理 string 类型的配置
 {
     char  *p = conf;
 
@@ -1048,7 +1048,7 @@ ngx_conf_set_str_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 
 char *
-ngx_conf_set_str_array_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+ngx_conf_set_str_array_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) // 处理数组类型的配置
 {
     char  *p = conf;
 
@@ -1084,7 +1084,7 @@ ngx_conf_set_str_array_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 
 char *
-ngx_conf_set_keyval_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+ngx_conf_set_keyval_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) // 处理KV类型的配置
 {
     char  *p = conf;
 
@@ -1122,7 +1122,7 @@ ngx_conf_set_keyval_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 
 char *
-ngx_conf_set_num_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+ngx_conf_set_num_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) // 处理数字类型的配置项
 {
     char  *p = conf;
 
@@ -1131,7 +1131,7 @@ ngx_conf_set_num_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_conf_post_t  *post;
 
 
-    np = (ngx_int_t *) (p + cmd->offset);
+    np = (ngx_int_t *) (p + cmd->offset); // 找到结构体的偏移量
 
     if (*np != NGX_CONF_UNSET) {
         return "is duplicate";
@@ -1143,7 +1143,7 @@ ngx_conf_set_num_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return "invalid number";
     }
 
-    if (cmd->post) {
+    if (cmd->post) { // 如果 ngx_command_t 中的 post 已经实现，则还需要调用它的 post_handler 方法
         post = cmd->post;
         return post->post_handler(cf, post, np);
     }
@@ -1153,7 +1153,7 @@ ngx_conf_set_num_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 
 char *
-ngx_conf_set_size_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+ngx_conf_set_size_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) // 处理size类型的配置项
 {
     char  *p = conf;
 
@@ -1184,7 +1184,7 @@ ngx_conf_set_size_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 
 char *
-ngx_conf_set_off_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+ngx_conf_set_off_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) // 处理 offset类型的配置 G M K b
 {
     char  *p = conf;
 
@@ -1215,7 +1215,7 @@ ngx_conf_set_off_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 
 char *
-ngx_conf_set_msec_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+ngx_conf_set_msec_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) // 处理毫秒类型配置
 {
     char  *p = conf;
 
@@ -1246,7 +1246,7 @@ ngx_conf_set_msec_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 
 char *
-ngx_conf_set_sec_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+ngx_conf_set_sec_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) // 处理秒类型配置
 {
     char  *p = conf;
 
@@ -1277,7 +1277,7 @@ ngx_conf_set_sec_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 
 char *
-ngx_conf_set_bufs_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+ngx_conf_set_bufs_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) // 处理buf配置
 {
     char *p = conf;
 
@@ -1307,7 +1307,7 @@ ngx_conf_set_bufs_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 
 char *
-ngx_conf_set_enum_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+ngx_conf_set_enum_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) // 处理 enum类型配置
 {
     char  *p = conf;
 
