@@ -18,10 +18,10 @@ typedef void *            ngx_buf_tag_t;
 typedef struct ngx_buf_s  ngx_buf_t;
 
 struct ngx_buf_s {
-    u_char          *pos;
-    u_char          *last;
-    off_t            file_pos;
-    off_t            file_last;
+    u_char          *pos;    // 内存中当前位置
+    u_char          *last;   // 内存中有效的最后位置
+    off_t            file_pos;  // 文件中当前位置
+    off_t            file_last;  // 文件中有效的最后位置
 
     u_char          *start;         /* start of buffer */
     u_char          *end;           /* end of buffer */
@@ -65,7 +65,7 @@ struct ngx_chain_s {
 typedef struct {
     ngx_int_t    num;
     size_t       size;
-} ngx_bufs_t;
+} ngx_bufs_t; // bufs->num * bufs->size 就是所有 buf 的 大小
 
 
 typedef struct ngx_output_chain_ctx_s  ngx_output_chain_ctx_t;

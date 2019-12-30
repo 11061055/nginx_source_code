@@ -10,11 +10,11 @@
 
 
 ngx_buf_t *
-ngx_create_temp_buf(ngx_pool_t *pool, size_t size)
+ngx_create_temp_buf(ngx_pool_t *pool, size_t size) // 获取临时 buf 大小 为 size
 {
     ngx_buf_t *b;
 
-    b = ngx_calloc_buf(pool);
+    b = ngx_calloc_buf(pool); // #define ngx_calloc_buf(pool) ngx_pcalloc(pool, sizeof(ngx_buf_t)) 获取 ngx_buf_s
     if (b == NULL) {
         return NULL;
     }
@@ -45,7 +45,7 @@ ngx_create_temp_buf(ngx_pool_t *pool, size_t size)
 
 
 ngx_chain_t *
-ngx_alloc_chain_link(ngx_pool_t *pool)
+ngx_alloc_chain_link(ngx_pool_t *pool) // 获取一个ngx_chain_s结构体 来关联各个 buf
 {
     ngx_chain_t  *cl;
 
@@ -66,7 +66,7 @@ ngx_alloc_chain_link(ngx_pool_t *pool)
 
 
 ngx_chain_t *
-ngx_create_chain_of_bufs(ngx_pool_t *pool, ngx_bufs_t *bufs)
+ngx_create_chain_of_bufs(ngx_pool_t *pool, ngx_bufs_t *bufs) // 创建一个 包含 bufs->num 个 元素 每个 元素 bufs->size 大小 的 buf
 {
     u_char       *p;
     ngx_int_t     i;
@@ -124,7 +124,7 @@ ngx_create_chain_of_bufs(ngx_pool_t *pool, ngx_bufs_t *bufs)
 
 
 ngx_int_t
-ngx_chain_add_copy(ngx_pool_t *pool, ngx_chain_t **chain, ngx_chain_t *in)
+ngx_chain_add_copy(ngx_pool_t *pool, ngx_chain_t **chain, ngx_chain_t *in) // 把 in 中的 buf 迁移到 chain 对应的 buf 中
 {
     ngx_chain_t  *cl, **ll;
 
@@ -153,7 +153,7 @@ ngx_chain_add_copy(ngx_pool_t *pool, ngx_chain_t **chain, ngx_chain_t *in)
 
 
 ngx_chain_t *
-ngx_chain_get_free_buf(ngx_pool_t *p, ngx_chain_t **free)
+ngx_chain_get_free_buf(ngx_pool_t *p, ngx_chain_t **free) // 获取一个空闲的buf, 如果 free 对应链表中有则取，如果没有则申请
 {
     ngx_chain_t  *cl;
 
@@ -179,13 +179,19 @@ ngx_chain_get_free_buf(ngx_pool_t *p, ngx_chain_t **free)
     return cl;
 }
 
+/**
+ * 释放BUF
+ * 1. 如果buf不为空，则不释放
+ * 2. 如果cl->buf->tag标记不一样，则直接还给Nginx的pool->chain链表
+ * 3. 如果buf为空，并且需要释放，则直接释放buf，并且放到free的空闲列表上
+ */
 
 void
 ngx_chain_update_chains(ngx_pool_t *p, ngx_chain_t **free, ngx_chain_t **busy,
     ngx_chain_t **out, ngx_buf_tag_t tag)
 {
     ngx_chain_t  *cl;
-
+    // 将 out 拼接 到 busy 的 尾部
     if (*busy == NULL) {
         *busy = *out;
 
@@ -197,20 +203,20 @@ ngx_chain_update_chains(ngx_pool_t *p, ngx_chain_t **free, ngx_chain_t **busy,
 
     *out = NULL;
 
-    while (*busy) {
+    while (*busy) { // 遍历连表
         cl = *busy;
 
-        if (ngx_buf_size(cl->buf) != 0) {
+        if (ngx_buf_size(cl->buf) != 0) { // 如果有单元不为空则不释放连表 (ngx_buf_in_memory(b) ? (off_t) (b->last - b->pos):  (b->file_last - b->file_pos))
             break;
         }
 
-        if (cl->buf->tag != tag) {
+        if (cl->buf->tag != tag) { // 如果有标签不一样，则将当前单元归还给pool的chain连表
             *busy = cl->next;
             ngx_free_chain(p, cl);
             continue;
         }
 
-        cl->buf->pos = cl->buf->start;
+        cl->buf->pos = cl->buf->start; // 否则归位当前单元的数据指针，并且将当前单元置于free连表中
         cl->buf->last = cl->buf->start;
 
         *busy = cl->next;
@@ -219,7 +225,7 @@ ngx_chain_update_chains(ngx_pool_t *p, ngx_chain_t **free, ngx_chain_t **busy,
     }
 }
 
-
+// 计算所有文件buf中总共要发送的字节数
 off_t
 ngx_chain_coalesce_file(ngx_chain_t **in, off_t limit)
 {
@@ -233,7 +239,7 @@ ngx_chain_coalesce_file(ngx_chain_t **in, off_t limit)
     fd = cl->buf->file->fd;
 
     do {
-        size = cl->buf->file_last - cl->buf->file_pos;
+        size = cl->buf->file_last - cl->buf->file_pos; // 当前要发送的字节数目
 
         if (size > limit - total) {
             size = limit - total;
@@ -261,7 +267,7 @@ ngx_chain_coalesce_file(ngx_chain_t **in, off_t limit)
     return total;
 }
 
-
+// 从连表中的前面buf中发送累积sent个字节
 ngx_chain_t *
 ngx_chain_update_sent(ngx_chain_t *in, off_t sent)
 {
@@ -269,7 +275,7 @@ ngx_chain_update_sent(ngx_chain_t *in, off_t sent)
 
     for ( /* void */ ; in; in = in->next) {
 
-        if (ngx_buf_special(in->buf)) {
+        if (ngx_buf_special(in->buf)) { // ((b->flush || b->last_buf || b->sync)  && !ngx_buf_in_memory(b) && !b->in_file)
             continue;
         }
 
@@ -278,7 +284,7 @@ ngx_chain_update_sent(ngx_chain_t *in, off_t sent)
         }
 
         size = ngx_buf_size(in->buf);
-
+        // sent>size则该buf中的所有数据都需要发送出去
         if (sent >= size) {
             sent -= size;
 
