@@ -15,7 +15,7 @@ static ngx_int_t ngx_parse_inet6_url(ngx_pool_t *pool, ngx_url_t *u);
 
 
 in_addr_t
-ngx_inet_addr(u_char *text, size_t len)
+ngx_inet_addr(u_char *text, size_t len) // IP 地址转整型
 {
     u_char      *p, c;
     in_addr_t    addr;
@@ -176,7 +176,7 @@ ngx_inet6_addr(u_char *p, size_t len, u_char *addr)
 
 #endif
 
-
+// 将sockaddr表示形式的地址，转换成字符串表示形式
 size_t
 ngx_sock_ntop(struct sockaddr *sa, socklen_t socklen, u_char *text, size_t len,
     ngx_uint_t port)
@@ -255,7 +255,7 @@ ngx_sock_ntop(struct sockaddr *sa, socklen_t socklen, u_char *text, size_t len,
     }
 }
 
-
+// 将IPv4/IPv6地址转换成字符串表示形式
 size_t
 ngx_inet_ntop(int family, void *addr, u_char *text, size_t len)
 {
@@ -364,7 +364,7 @@ ngx_inet6_ntop(u_char *p, u_char *text, size_t len)
 
 #endif
 
-
+// 将字符串转换成无类域间路由
 ngx_int_t
 ngx_ptocidr(ngx_str_t *text, ngx_cidr_t *cidr)
 {
@@ -379,7 +379,7 @@ ngx_ptocidr(ngx_str_t *text, ngx_cidr_t *cidr)
     addr = text->data;
     last = addr + text->len;
 
-    mask = ngx_strlchr(addr, last, '/');
+    mask = ngx_strlchr(addr, last, '/'); // 找出无类域间路由中"/"的位置，例如222.80.18.18/25
     len = (mask ? mask : last) - addr;
 
     cidr->u.in.addr = ngx_inet_addr(addr, len);
@@ -387,8 +387,8 @@ ngx_ptocidr(ngx_str_t *text, ngx_cidr_t *cidr)
     if (cidr->u.in.addr != INADDR_NONE) {
         cidr->family = AF_INET;
 
-        if (mask == NULL) {
-            cidr->u.in.mask = 0xffffffff;
+        if (mask == NULL) { // 如果没有/
+            cidr->u.in.mask = 0xffffffff; // 则 mask 为全 1
             return NGX_OK;
         }
 
@@ -447,7 +447,7 @@ ngx_ptocidr(ngx_str_t *text, ngx_cidr_t *cidr)
         }
 
         if (shift) {
-            cidr->u.in.mask = htonl((uint32_t) (0xffffffffu << (32 - shift)));
+            cidr->u.in.mask = htonl((uint32_t) (0xffffffffu << (32 - shift))); // 全1进行移位以找到掩码
 
         } else {
             /* x86 compilers use a shl instruction that shifts by modulo 32 */
@@ -458,13 +458,13 @@ ngx_ptocidr(ngx_str_t *text, ngx_cidr_t *cidr)
             return NGX_OK;
         }
 
-        cidr->u.in.addr &= cidr->u.in.mask;
+        cidr->u.in.addr &= cidr->u.in.mask; // 取地址的网络部分
 
         return NGX_DONE;
     }
 }
 
-
+// 本函数用于将字符串表示的IPv4/IPv6地址转换成ngx_addr_t形式
 ngx_int_t
 ngx_parse_addr(ngx_pool_t *pool, ngx_addr_t *addr, u_char *text, size_t len)
 {
@@ -623,7 +623,7 @@ ngx_parse_unix_domain_url(ngx_pool_t *pool, ngx_url_t *u)
 #endif
 }
 
-
+// 把url解析为各个部分
 static ngx_int_t
 ngx_parse_inet_url(ngx_pool_t *pool, ngx_url_t *u)
 {

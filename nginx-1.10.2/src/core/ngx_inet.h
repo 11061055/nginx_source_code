@@ -85,12 +85,12 @@ typedef struct {
     int                       family;
 
     unsigned                  listen:1;
-    unsigned                  uri_part:1;
-    unsigned                  no_resolve:1;
+    unsigned                  uri_part:1; // 是否具有uri部分
+    unsigned                  no_resolve:1; // 需不需要进行DNS解析
     unsigned                  one_addr:1;  /* compatibility */
 
-    unsigned                  no_port:1;
-    unsigned                  wildcard:1;
+    unsigned                  no_port:1; // 表明当前url中是否配置了端口(如果没有配置，且需要端口的话，则会采用默认端口)
+    unsigned                  wildcard:1; // 是否为一个通配地址
 
     socklen_t                 socklen;
     u_char                    sockaddr[NGX_SOCKADDRLEN];
