@@ -14,12 +14,12 @@
 
 
 struct ngx_file_s {
-    ngx_fd_t                   fd;
-    ngx_str_t                  name;
-    ngx_file_info_t            info;
+    ngx_fd_t                   fd; // 文件句柄
+    ngx_str_t                  name; // 文件名称
+    ngx_file_info_t            info; // struct stat
 
-    off_t                      offset;
-    off_t                      sys_offset;
+    off_t                      offset; // 当前要操作的文件指针偏移
+    off_t                      sys_offset; // 当前该打开文件的实际指针偏移
 
     ngx_log_t                 *log;
 
@@ -47,16 +47,16 @@ typedef void (*ngx_path_loader_pt) (void *data);
 
 
 typedef struct {
-    ngx_str_t                  name;
-    size_t                     len;
-    size_t                     level[3];
+    ngx_str_t                  name; // 文件名称
+    size_t                     len; // level中3个数据之和
+    size_t                     level[3]; // 每层目录名的长度，最多三层
 
-    ngx_path_manager_pt        manager;
-    ngx_path_loader_pt         loader;
-    void                      *data;
+    ngx_path_manager_pt        manager; //文件缓冲管理回调
+    ngx_path_loader_pt         loader; //文件缓冲loader回调
+    void                      *data; // 回调上下文
 
-    u_char                    *conf_file;
-    ngx_uint_t                 line;
+    u_char                    *conf_file; //所关联的配置文件名称 ngx_conf_t->conf_file->file.name.data;
+    ngx_uint_t                 line; // 所在配置文件的行数
 } ngx_path_t;
 
 
@@ -83,20 +83,20 @@ typedef struct {
 
 
 typedef struct {
-    ngx_uint_t                 access;
-    ngx_uint_t                 path_access;
+    ngx_uint_t                 access; // 文件权限
+    ngx_uint_t                 path_access; // 路径权限
     time_t                     time;
     ngx_fd_t                   fd;
 
-    unsigned                   create_path:1;
-    unsigned                   delete_file:1;
+    unsigned                   create_path:1; // 是否创建路径
+    unsigned                   delete_file:1; // 重命名失败是否删除文件
 
     ngx_log_t                 *log;
 } ngx_ext_rename_file_t;
 
 
 typedef struct {
-    off_t                      size;
+    off_t                      size; // 要拷贝的文件大小
     size_t                     buf_size;
 
     ngx_uint_t                 access;
@@ -111,20 +111,21 @@ typedef struct ngx_tree_ctx_s  ngx_tree_ctx_t;
 typedef ngx_int_t (*ngx_tree_init_handler_pt) (void *ctx, void *prev);
 typedef ngx_int_t (*ngx_tree_handler_pt) (ngx_tree_ctx_t *ctx, ngx_str_t *name);
 
+// 这里是nginx遍历目录的相关数据结构
 struct ngx_tree_ctx_s {
-    off_t                      size;
-    off_t                      fs_size;
-    ngx_uint_t                 access;
-    time_t                     mtime;
+    off_t                      size; // 遍历到的文件的大小
+    off_t                      fs_size; // 文件所占磁盘块数目乘以512的值与size中的最大值，即fs_size = ngx_max(size,st_blocks*512)
+    ngx_uint_t                 access; // 文件权限
+    time_t                     mtime; // 文件修改时间
 
     ngx_tree_init_handler_pt   init_handler;
-    ngx_tree_handler_pt        file_handler;
-    ngx_tree_handler_pt        pre_tree_handler;
-    ngx_tree_handler_pt        post_tree_handler;
-    ngx_tree_handler_pt        spec_handler;
+    ngx_tree_handler_pt        file_handler; // 处理普通文件的回调函数
+    ngx_tree_handler_pt        pre_tree_handler; // 进入一个目录前的回调函数
+    ngx_tree_handler_pt        post_tree_handler;// 离开一个目录后的回调函数
+    ngx_tree_handler_pt        spec_handler;// 处理特殊文件的回调函数，比如socket、FIFO等
 
-    void                      *data;
-    size_t                     alloc;
+    void                      *data; // data 是待分配的 数据结构
+    size_t                     alloc; // 如果需要分配一些数据结构，在这里指定分配数据结构的大小，并由init_handler进行初始化，参见ngx_walk_tree
 
     ngx_log_t                 *log;
 };
