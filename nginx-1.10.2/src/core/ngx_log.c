@@ -43,6 +43,15 @@ static ngx_command_t  ngx_errlog_commands[] = {
       ngx_null_command
 };
 
+/*
+
+typedef struct {
+    ngx_str_t             name;
+    void               *(*create_conf)(ngx_cycle_t *cycle); // 创建存储配置参数的结构体
+    char               *(*init_conf)(ngx_cycle_t *cycle, void *conf); // 初始化存储配置参数
+} ngx_core_module_t;
+
+*/
 
 static ngx_core_module_t  ngx_errlog_module_ctx = {
     ngx_string("errlog"),
@@ -99,7 +108,7 @@ ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
 #else
 
 void
-ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
+ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err, // 写 log 链表
     const char *fmt, va_list args)
 
 #endif
@@ -110,21 +119,21 @@ ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
     u_char      *p, *last, *msg;
     ssize_t      n;
     ngx_uint_t   wrote_stderr, debug_connection;
-    u_char       errstr[NGX_MAX_ERROR_STR];
+    u_char       errstr[NGX_MAX_ERROR_STR]; // 用于保存数据
 
     last = errstr + NGX_MAX_ERROR_STR;
 
-    p = ngx_cpymem(errstr, ngx_cached_err_log_time.data,
+    p = ngx_cpymem(errstr, ngx_cached_err_log_time.data, // 拷贝当前时间
                    ngx_cached_err_log_time.len);
 
-    p = ngx_slprintf(p, last, " [%V] ", &err_levels[level]);
+    p = ngx_slprintf(p, last, " [%V] ", &err_levels[level]); // 拷贝日志级别
 
     /* pid#tid */
-    p = ngx_slprintf(p, last, "%P#" NGX_TID_T_FMT ": ",
+    p = ngx_slprintf(p, last, "%P#" NGX_TID_T_FMT ": ", // 拷贝进程pid
                     ngx_log_pid, ngx_log_tid);
 
     if (log->connection) {
-        p = ngx_slprintf(p, last, "*%uA ", log->connection);
+        p = ngx_slprintf(p, last, "*%uA ", log->connection); // 连接数
     }
 
     msg = p;
@@ -146,7 +155,7 @@ ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
     }
 
     if (level != NGX_LOG_DEBUG && log->handler) {
-        p = log->handler(log, p, last - p);
+        p = log->handler(log, p, last - p); // 第一个回调函数
     }
 
     if (p > last - NGX_LINEFEED_SIZE) {
@@ -165,7 +174,7 @@ ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
         }
 
         if (log->writer) {
-            log->writer(log, level, errstr, p - errstr);
+            log->writer(log, level, errstr, p - errstr); // 写之前回调
             goto next;
         }
 
@@ -180,7 +189,7 @@ ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
             goto next;
         }
 
-        n = ngx_write_fd(log->file->fd, errstr, p - errstr);
+        n = ngx_write_fd(log->file->fd, errstr, p - errstr); // write(fd, buf, n);
 
         if (n == -1 && ngx_errno == NGX_ENOSPC) {
             log->disk_full_time = ngx_time();
@@ -192,7 +201,7 @@ ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
 
     next:
 
-        log = log->next;
+        log = log->next; // 遍历下一个 log 结构体
     }
 
     if (!ngx_use_stderr
@@ -206,7 +215,7 @@ ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
 
     (void) ngx_sprintf(msg, "nginx: [%V] ", &err_levels[level]);
 
-    (void) ngx_write_console(ngx_stderr, msg, p - msg);
+    (void) ngx_write_console(ngx_stderr, msg, p - msg); // 输出到屏幕
 }
 
 
@@ -313,7 +322,7 @@ ngx_log_errno(u_char *buf, u_char *last, ngx_err_t err)
     return buf;
 }
 
-
+// main 函数中初始化
 ngx_log_t *
 ngx_log_init(u_char *prefix)
 {
@@ -431,7 +440,7 @@ ngx_log_open_default(ngx_cycle_t *cycle)
     }
 
     if (log != &cycle->new_log) {
-        ngx_log_insert(&cycle->new_log, log);
+        ngx_log_insert(&cycle->new_log, log); // log 列表增加
     }
 
     return NGX_OK;
@@ -439,7 +448,7 @@ ngx_log_open_default(ngx_cycle_t *cycle)
 
 
 ngx_int_t
-ngx_log_redirect_stderr(ngx_cycle_t *cycle)
+ngx_log_redirect_stderr(ngx_cycle_t *cycle) // 错误输出重定向
 {
     ngx_fd_t  fd;
 
@@ -479,7 +488,7 @@ ngx_log_get_file_log(ngx_log_t *head)
 
 
 static char *
-ngx_log_set_levels(ngx_conf_t *cf, ngx_log_t *log)
+ngx_log_set_levels(ngx_conf_t *cf, ngx_log_t *log) // 从配置文件中初始化日志级别
 {
     ngx_uint_t   i, n, d, found;
     ngx_str_t   *value;
@@ -553,7 +562,7 @@ ngx_error_log(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 
 char *
-ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head)
+ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head) // 设置日志方式
 {
     ngx_log_t          *new_log;
     ngx_str_t          *value, name;
@@ -576,16 +585,16 @@ ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head)
 
     value = cf->args->elts;
 
-    if (ngx_strcmp(value[1].data, "stderr") == 0) {
+    if (ngx_strcmp(value[1].data, "stderr") == 0) { // 标准输出
         ngx_str_null(&name);
         cf->cycle->log_use_stderr = 1;
 
-        new_log->file = ngx_conf_open_file(cf->cycle, &name);
+        new_log->file = ngx_conf_open_file(cf->cycle, &name); // 空文件
         if (new_log->file == NULL) {
             return NGX_CONF_ERROR;
         }
 
-    } else if (ngx_strncmp(value[1].data, "memory:", 7) == 0) {
+    } else if (ngx_strncmp(value[1].data, "memory:", 7) == 0) { // 内存型日志
 
 #if (NGX_DEBUG)
         size_t                 size, needed;
@@ -609,6 +618,17 @@ ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head)
             return NGX_CONF_ERROR;
         }
 
+        /*
+
+typedef struct {
+    u_char        *start;
+    u_char        *end;
+    u_char        *pos;
+    ngx_atomic_t   written;
+} ngx_log_memory_buf_t;
+
+        */
+
         buf = ngx_pcalloc(cf->pool, sizeof(ngx_log_memory_buf_t));
         if (buf == NULL) {
             return NGX_CONF_ERROR;
@@ -627,13 +647,13 @@ ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head)
 
         ngx_memset(buf->pos, ' ', buf->end - buf->pos);
 
-        cln = ngx_pool_cleanup_add(cf->pool, 0);
+        cln = ngx_pool_cleanup_add(cf->pool, 0); // 插入一个cleanup结构体
         if (cln == NULL) {
             return NGX_CONF_ERROR;
         }
 
         cln->data = new_log;
-        cln->handler = ngx_log_memory_cleanup;
+        cln->handler = ngx_log_memory_cleanup; // 指定 内存释放函数
 
         new_log->writer = ngx_log_memory_writer;
         new_log->wdata = buf;
@@ -644,7 +664,7 @@ ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head)
         return NGX_CONF_ERROR;
 #endif
 
-    } else if (ngx_strncmp(value[1].data, "syslog:", 7) == 0) {
+    } else if (ngx_strncmp(value[1].data, "syslog:", 7) == 0) { // 写syslog
         peer = ngx_pcalloc(cf->pool, sizeof(ngx_syslog_peer_t));
         if (peer == NULL) {
             return NGX_CONF_ERROR;
@@ -657,7 +677,7 @@ ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head)
         new_log->writer = ngx_syslog_writer;
         new_log->wdata = peer;
 
-    } else {
+    } else { // 文件类型日志
         new_log->file = ngx_conf_open_file(cf->cycle, &value[1]);
         if (new_log->file == NULL) {
             return NGX_CONF_ERROR;
@@ -677,7 +697,7 @@ ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head)
 
 
 static void
-ngx_log_insert(ngx_log_t *log, ngx_log_t *new_log)
+ngx_log_insert(ngx_log_t *log, ngx_log_t *new_log) // 插入log
 {
     ngx_log_t  tmp;
 

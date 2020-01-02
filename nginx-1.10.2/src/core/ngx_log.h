@@ -48,15 +48,15 @@ typedef void (*ngx_log_writer_pt) (ngx_log_t *log, ngx_uint_t level,
 
 
 struct ngx_log_s {
-    ngx_uint_t           log_level;
-    ngx_open_file_t     *file;
+    ngx_uint_t           log_level; // 日志级别
+    ngx_open_file_t     *file; // 日志文件
 
-    ngx_atomic_uint_t    connection;
+    ngx_atomic_uint_t    connection; // 连接数
 
     time_t               disk_full_time;
 
-    ngx_log_handler_pt   handler;
-    void                *data;
+    ngx_log_handler_pt   handler; // 记录日志时的回调方法
+    void                *data; // 额外数据，通常在实现了handler之后才可用
 
     ngx_log_writer_pt    writer;
     void                *wdata;
