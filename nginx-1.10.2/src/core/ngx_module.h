@@ -244,8 +244,8 @@
 
 
 struct ngx_module_s {
-    ngx_uint_t            ctx_index;
-    ngx_uint_t            index;
+    ngx_uint_t            ctx_index; // type 字段决定一类模块,该字段决定在该类模块中的顺序,也是优先级,启动时同一类模块按该顺序
+    ngx_uint_t            index; // 在所有模块中的顺序
 
     char                 *name;
 
@@ -255,18 +255,18 @@ struct ngx_module_s {
     ngx_uint_t            version;
     const char           *signature;
 
-    void                 *ctx;
-    ngx_command_t        *commands;
-    ngx_uint_t            type;
+    void                 *ctx;      // 一类模块的上下文信息
+    ngx_command_t        *commands; // 处理 .conf 中的配置项
+    ngx_uint_t            type; // HTTP CORE CONF MAIL EVENT
 
     ngx_int_t           (*init_master)(ngx_log_t *log);
 
-    ngx_int_t           (*init_module)(ngx_cycle_t *cycle);
+    ngx_int_t           (*init_module)(ngx_cycle_t *cycle); // 在启动worker进程前调用完毕
 
-    ngx_int_t           (*init_process)(ngx_cycle_t *cycle);
+    ngx_int_t           (*init_process)(ngx_cycle_t *cycle); // 在启动worker进程后调用完毕
     ngx_int_t           (*init_thread)(ngx_cycle_t *cycle);
     void                (*exit_thread)(ngx_cycle_t *cycle);
-    void                (*exit_process)(ngx_cycle_t *cycle);
+    void                (*exit_process)(ngx_cycle_t *cycle); // worker退出前调用
 
     void                (*exit_master)(ngx_cycle_t *cycle);
 
@@ -283,8 +283,8 @@ struct ngx_module_s {
 
 typedef struct {
     ngx_str_t             name;
-    void               *(*create_conf)(ngx_cycle_t *cycle);
-    char               *(*init_conf)(ngx_cycle_t *cycle, void *conf);
+    void               *(*create_conf)(ngx_cycle_t *cycle); // 创建存储配置参数的结构体
+    char               *(*init_conf)(ngx_cycle_t *cycle, void *conf); // 初始化存储配置参数
 } ngx_core_module_t;
 
 
@@ -298,10 +298,10 @@ ngx_int_t ngx_add_module(ngx_conf_t *cf, ngx_str_t *file,
     ngx_module_t *module, char **order);
 
 
-extern ngx_module_t  *ngx_modules[];
+extern ngx_module_t  *ngx_modules[]; // 保存所有模块
 extern ngx_uint_t     ngx_max_module;
 
-extern char          *ngx_module_names[];
+extern char          *ngx_module_names[]; // 保存所有模块的名称，顺序与ngx_modules一致
 
 
 #endif /* _NGX_MODULE_H_INCLUDED_ */

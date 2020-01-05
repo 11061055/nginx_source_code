@@ -27,20 +27,20 @@ ngx_preinit_modules(void)
 {
     ngx_uint_t  i;
 
-    for (i = 0; ngx_modules[i]; i++) {
-        ngx_modules[i]->index = i;
+    for (i = 0; ngx_modules[i]; i++) { // 遍历所有模块
+        ngx_modules[i]->index = i; // 设置角标
         ngx_modules[i]->name = ngx_module_names[i];
     }
 
     ngx_modules_n = i;
-    ngx_max_module = ngx_modules_n + NGX_MAX_DYNAMIC_MODULES;
+    ngx_max_module = ngx_modules_n + NGX_MAX_DYNAMIC_MODULES; // NGX_MAX_DYNAMIC_MODULES 128
 
     return NGX_OK;
 }
 
 
 ngx_int_t
-ngx_cycle_modules(ngx_cycle_t *cycle)
+ngx_cycle_modules(ngx_cycle_t *cycle) // ngx_init_cycle 中调用 将所有的 模块 拷贝到 cycle 中去
 {
     /*
      * create a list of modules to be used for this cycle,
@@ -69,7 +69,7 @@ ngx_init_modules(ngx_cycle_t *cycle)
 
     for (i = 0; cycle->modules[i]; i++) {
         if (cycle->modules[i]->init_module) {
-            if (cycle->modules[i]->init_module(cycle) != NGX_OK) {
+            if (cycle->modules[i]->init_module(cycle) != NGX_OK) { // 统一入口 所有模块进行init_module，在ngx_init_cycle中调用
                 return NGX_ERROR;
             }
         }
@@ -80,7 +80,7 @@ ngx_init_modules(ngx_cycle_t *cycle)
 
 
 ngx_int_t
-ngx_count_modules(ngx_cycle_t *cycle, ngx_uint_t type)
+ngx_count_modules(ngx_cycle_t *cycle, ngx_uint_t type) // 统计同一类模块的个数，并设置对应的 ctx_index
 {
     ngx_uint_t     i, next, max;
     ngx_module_t  *module;
@@ -154,7 +154,7 @@ ngx_count_modules(ngx_cycle_t *cycle, ngx_uint_t type)
 
 
 ngx_int_t
-ngx_add_module(ngx_conf_t *cf, ngx_str_t *file, ngx_module_t *module,
+ngx_add_module(ngx_conf_t *cf, ngx_str_t *file, ngx_module_t *module, // 在执行到load_module指令时，会调用本函数添加一个模块
     char **order)
 {
     void               *rv;
@@ -195,7 +195,7 @@ ngx_add_module(ngx_conf_t *cf, ngx_str_t *file, ngx_module_t *module,
      */
 
     if (module->index == NGX_MODULE_UNSET_INDEX) {
-        module->index = ngx_module_index(cf->cycle);
+        module->index = ngx_module_index(cf->cycle); // 获取最后一个模块的index
 
         if (module->index >= ngx_max_module) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
@@ -242,13 +242,13 @@ ngx_add_module(ngx_conf_t *cf, ngx_str_t *file, ngx_module_t *module,
 
     /* put the module before modules[before] */
 
-    if (before != cf->cycle->modules_n) {
+    if (before != cf->cycle->modules_n) { // 腾出一个位置插入模块
         ngx_memmove(&cf->cycle->modules[before + 1],
                     &cf->cycle->modules[before],
                     (cf->cycle->modules_n - before) * sizeof(ngx_module_t *));
     }
 
-    cf->cycle->modules[before] = module;
+    cf->cycle->modules[before] = module; // 插入模块到此位置
     cf->cycle->modules_n++;
 
     if (module->type == NGX_CORE_MODULE) {
@@ -316,7 +316,7 @@ again:
 
 
 static ngx_uint_t
-ngx_module_ctx_index(ngx_cycle_t *cycle, ngx_uint_t type, ngx_uint_t index)
+ngx_module_ctx_index(ngx_cycle_t *cycle, ngx_uint_t type, ngx_uint_t index) // 找到一类模块中最大的未使用的index
 {
     ngx_uint_t     i;
     ngx_module_t  *module;
