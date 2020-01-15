@@ -10,9 +10,17 @@
 #include <ngx_event.h>
 #include <ngx_event_connect.h>
 
+/*
+
+ngx_connection_t数据结构来表示连接，Nginx服务器被动接收的TCP连接
+Nginx会试图主动向其他上游服务器建立连接，Nginx定义ngx_peer_connection_t结构来表示，这类可以称为主动连接。
+本质上来说，主动连接是以ngx_connection_t结构体为基础实现的。
+
+*/
+
 
 ngx_int_t
-ngx_event_connect_peer(ngx_peer_connection_t *pc)
+ngx_event_connect_peer(ngx_peer_connection_t *pc) // 申请资源并且发起connect连接第三方
 {
     int                rc, type;
     ngx_int_t          event;
@@ -41,7 +49,7 @@ ngx_event_connect_peer(ngx_peer_connection_t *pc)
     }
 
 
-    c = ngx_get_connection(s, pc->log);
+    c = ngx_get_connection(s, pc->log); // 获取一个ngx_connection_t结构体，所以说是基于ngx_connection_t实现的
 
     if (c == NULL) {
         if (ngx_close_socket(s) == -1) {
@@ -72,7 +80,7 @@ ngx_event_connect_peer(ngx_peer_connection_t *pc)
     }
 
     if (pc->local) {
-        if (bind(s, pc->local->sockaddr, pc->local->socklen) == -1) {
+        if (bind(s, pc->local->sockaddr, pc->local->socklen) == -1) { // 如果设置了本地套接字则要调用bind绑定
             ngx_log_error(NGX_LOG_CRIT, pc->log, ngx_socket_errno,
                           "bind(%V) failed", &pc->local->name);
 
@@ -124,7 +132,7 @@ ngx_event_connect_peer(ngx_peer_connection_t *pc)
     ngx_log_debug3(NGX_LOG_DEBUG_EVENT, pc->log, 0,
                    "connect to %V, fd:%d #%uA", pc->name, s, c->number);
 
-    rc = connect(s, pc->sockaddr, pc->socklen);
+    rc = connect(s, pc->sockaddr, pc->socklen); // 发起connect
 
     if (rc == -1) {
         err = ngx_socket_errno;
@@ -219,7 +227,7 @@ ngx_event_connect_peer(ngx_peer_connection_t *pc)
         event = NGX_LEVEL_EVENT;
     }
 
-    if (ngx_add_event(rev, NGX_READ_EVENT, event) != NGX_OK) {
+    if (ngx_add_event(rev, NGX_READ_EVENT, event) != NGX_OK) { // 设置读事件读取nginx connect的返回值
         goto failed;
     }
 
