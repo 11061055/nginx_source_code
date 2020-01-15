@@ -13,7 +13,7 @@
 ngx_queue_t  ngx_posted_accept_events;
 ngx_queue_t  ngx_posted_events;
 
-
+// 处理队列中的事件
 void
 ngx_event_process_posted(ngx_cycle_t *cycle, ngx_queue_t *posted)
 {
