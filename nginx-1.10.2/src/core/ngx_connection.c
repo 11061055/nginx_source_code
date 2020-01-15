@@ -126,7 +126,7 @@ ngx_clone_listening(ngx_conf_t *cf, ngx_listening_t *ls)
     return NGX_OK;
 }
 
-
+// 设置继承下来的套接字
 ngx_int_t
 ngx_set_inherited_sockets(ngx_cycle_t *cycle)
 {
@@ -134,17 +134,17 @@ ngx_set_inherited_sockets(ngx_cycle_t *cycle)
     ngx_uint_t                 i;
     ngx_listening_t           *ls;
     socklen_t                  olen;
-#if (NGX_HAVE_DEFERRED_ACCEPT || NGX_HAVE_TCP_FASTOPEN)
+#if (NGX_HAVE_DEFERRED_ACCEPT || NGX_HAVE_TCP_FASTOPEN) // 快打开，第一个SYN包中就包含数据，客户端需带上选项 MSG_FASTOPEN，服务器需开启TCP_FASTOPEN
     ngx_err_t                  err;
 #endif
-#if (NGX_HAVE_DEFERRED_ACCEPT && defined SO_ACCEPTFILTER)
+#if (NGX_HAVE_DEFERRED_ACCEPT && defined SO_ACCEPTFILTER) // 连接过滤器
     struct accept_filter_arg   af;
 #endif
-#if (NGX_HAVE_DEFERRED_ACCEPT && defined TCP_DEFER_ACCEPT)
+#if (NGX_HAVE_DEFERRED_ACCEPT && defined TCP_DEFER_ACCEPT) // 延迟接收
     int                        timeout;
 #endif
 #if (NGX_HAVE_REUSEPORT)
-    int                        reuseport;
+    int                        reuseport; // 端口重用
 #endif
 
     ls = cycle->listening.elts;
@@ -161,7 +161,7 @@ ngx_set_inherited_sockets(ngx_cycle_t *cycle)
                           "getsockname() of the inherited "
                           "socket #%d failed", ls[i].fd);
             ls[i].ignore = 1;
-            continue;
+            continue; // 不处理 ignore 设置为 1
         }
 
         switch (ls[i].sockaddr->sa_family) {
@@ -375,7 +375,7 @@ ngx_set_inherited_sockets(ngx_cycle_t *cycle)
     return NGX_OK;
 }
 
-
+// 重复5次打开套接字
 ngx_int_t
 ngx_open_listening_sockets(ngx_cycle_t *cycle)
 {
@@ -436,7 +436,7 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
                 continue;
             }
 
-            if (ls[i].inherited) {
+            if (ls[i].inherited) { // 继承下来的 待做
 
                 /* TODO: close on exit */
                 /* TODO: nonblocking */
@@ -445,7 +445,7 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
                 continue;
             }
 
-            s = ngx_socket(ls[i].sockaddr->sa_family, ls[i].type, 0);
+            s = ngx_socket(ls[i].sockaddr->sa_family, ls[i].type, 0); // 新建套接字
 
             if (s == (ngx_socket_t) -1) {
                 ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
@@ -515,7 +515,7 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
 #endif
             /* TODO: close on exit */
 
-            if (!(ngx_event_flags & NGX_USE_IOCP_EVENT)) {
+            if (!(ngx_event_flags & NGX_USE_IOCP_EVENT)) { // 非阻塞
                 if (ngx_nonblocking(s) == -1) {
                     ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
                                   ngx_nonblocking_n " %V failed",
@@ -534,7 +534,7 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
             ngx_log_debug2(NGX_LOG_DEBUG_CORE, log, 0,
                            "bind() %V #%d ", &ls[i].addr_text, s);
 
-            if (bind(s, ls[i].sockaddr, ls[i].socklen) == -1) {
+            if (bind(s, ls[i].sockaddr, ls[i].socklen) == -1) { // bind 绑定
                 err = ngx_socket_errno;
 
                 if (err != NGX_EADDRINUSE || !ngx_test_config) {
@@ -587,7 +587,7 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
                 continue;
             }
 
-            if (listen(s, ls[i].backlog) == -1) {
+            if (listen(s, ls[i].backlog) == -1) { // listen 监听
                 err = ngx_socket_errno;
 
                 /*
@@ -646,7 +646,7 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
 
 
 void
-ngx_configure_listening_sockets(ngx_cycle_t *cycle)
+ngx_configure_listening_sockets(ngx_cycle_t *cycle) // 设置套接字选项 比如 buffer 大小，TCP KEEPALIVE选项等
 {
     int                        value;
     ngx_uint_t                 i;
@@ -895,7 +895,7 @@ ngx_configure_listening_sockets(ngx_cycle_t *cycle)
         {
             value = 1;
 
-            if (setsockopt(ls[i].fd, IPPROTO_IP, IP_RECVDSTADDR,
+            if (setsockopt(ls[i].fd, IPPROTO_IP, IP_RECVDSTADDR, // 对于udp而言，通常只返回客户端的地址，需要知道哪个IP接收则需要设置该选项
                            (const void *) &value, sizeof(int))
                 == -1)
             {
@@ -1026,7 +1026,7 @@ ngx_close_listening_sockets(ngx_cycle_t *cycle)
 
 
 ngx_connection_t *
-ngx_get_connection(ngx_socket_t s, ngx_log_t *log)
+ngx_get_connection(ngx_socket_t s, ngx_log_t *log) // 获取一个连接
 {
     ngx_uint_t         instance;
     ngx_event_t       *rev, *wev;
@@ -1045,7 +1045,7 @@ ngx_get_connection(ngx_socket_t s, ngx_log_t *log)
     c = ngx_cycle->free_connections;
 
     if (c == NULL) {
-        ngx_drain_connections();
+        ngx_drain_connections(); // 连接不够，则释放一个keepalive连接
         c = ngx_cycle->free_connections;
     }
 
@@ -1057,8 +1057,8 @@ ngx_get_connection(ngx_socket_t s, ngx_log_t *log)
         return NULL;
     }
 
-    ngx_cycle->free_connections = c->data;
-    ngx_cycle->free_connection_n--;
+    ngx_cycle->free_connections = c->data; // 空闲连接指向下一个
+    ngx_cycle->free_connection_n--; // 连接数减1
 
     if (ngx_cycle->files && ngx_cycle->files[s] == NULL) {
         ngx_cycle->files[s] = c;
@@ -1228,23 +1228,24 @@ ngx_reusable_connection(ngx_connection_t *c, ngx_uint_t reusable)
 
 
 static void
-ngx_drain_connections(void)
+ngx_drain_connections(void) // 清理keepalive连接，以供新连接使用，ngx_get_connection中会调用
 {
     ngx_int_t          i;
     ngx_queue_t       *q;
     ngx_connection_t  *c;
 
-    for (i = 0; i < 32; i++) {
+    for (i = 0; i < 32; i++) { // 一次最多清理32个keepalive连接
         if (ngx_queue_empty(&ngx_cycle->reusable_connections_queue)) {
             break;
         }
 
-        q = ngx_queue_last(&ngx_cycle->reusable_connections_queue);
+        q = ngx_queue_last(&ngx_cycle->reusable_connections_queue); // LRU 获取老连接
         c = ngx_queue_data(q, ngx_connection_t, queue);
 
         ngx_log_debug0(NGX_LOG_DEBUG_CORE, c->log, 0,
                        "reusing connection");
-
+        // 这里的handler是ngx_http_keepalive_handler，这函数里，由于close被置1，
+        // 所以会执行ngx_http_close_connection来释放连接
         c->close = 1;
         c->read->handler(c->read);
     }
