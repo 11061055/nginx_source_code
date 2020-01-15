@@ -28,40 +28,40 @@ typedef struct {
 
 
 struct ngx_event_s {
-    void            *data;
+    void            *data; // 事件相关对象 比如 ngx_connection_t
 
-    unsigned         write:1;
+    unsigned         write:1; // 可写
 
-    unsigned         accept:1;
+    unsigned         accept:1; // 可以建立连接
 
     /* used to detect the stale events in kqueue and epoll */
-    unsigned         instance:1;
+    unsigned         instance:1; // 事件是否已经过期
 
     /*
      * the event was passed or would be passed to a kernel;
      * in aio mode - operation was posted.
      */
-    unsigned         active:1;
+    unsigned         active:1; // 活跃的
 
-    unsigned         disabled:1;
+    unsigned         disabled:1; // 禁用
 
     /* the ready event; in aio mode 0 means that no operation can be posted */
-    unsigned         ready:1;
+    unsigned         ready:1; // 就绪
 
     unsigned         oneshot:1;
 
     /* aio operation is complete */
     unsigned         complete:1;
 
-    unsigned         eof:1;
-    unsigned         error:1;
+    unsigned         eof:1; // 字符流结束
+    unsigned         error:1; // 出错
 
-    unsigned         timedout:1;
+    unsigned         timedout:1; // 超时
     unsigned         timer_set:1;
 
-    unsigned         delayed:1;
+    unsigned         delayed:1; // 延迟处理
 
-    unsigned         deferred_accept:1;
+    unsigned         deferred_accept:1; // 等到真正收到数据包才建立连接
 
     /* the pending eof reported by kqueue, epoll or in aio chain operation */
     unsigned         pending_eof:1;
@@ -103,7 +103,7 @@ struct ngx_event_s {
      */
 
 #if (NGX_HAVE_KQUEUE) || (NGX_HAVE_IOCP)
-    int              available;
+    int              available; // 对于accept表示套接字个数，对于读事件表示可读的字节数，对于写事件表示buffer的字节数，仅对KQUEUE生效
 #else
     unsigned         available:1;
 #endif
@@ -119,7 +119,7 @@ struct ngx_event_s {
 
     ngx_log_t       *log;
 
-    ngx_rbtree_node_t   timer;
+    ngx_rbtree_node_t   timer; // 定时器 红黑树实现
 
     /* the posted queue */
     ngx_queue_t      queue;
@@ -176,22 +176,22 @@ struct ngx_event_aio_s {
 
 
 typedef struct {
-    ngx_int_t  (*add)(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags);
-    ngx_int_t  (*del)(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags);
+    ngx_int_t  (*add)(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags); // 添加事件
+    ngx_int_t  (*del)(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags); // 删除事件
 
     ngx_int_t  (*enable)(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags);
     ngx_int_t  (*disable)(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags);
 
-    ngx_int_t  (*add_conn)(ngx_connection_t *c);
-    ngx_int_t  (*del_conn)(ngx_connection_t *c, ngx_uint_t flags);
+    ngx_int_t  (*add_conn)(ngx_connection_t *c); // 添加连接
+    ngx_int_t  (*del_conn)(ngx_connection_t *c, ngx_uint_t flags); // 删除连接
 
     ngx_int_t  (*notify)(ngx_event_handler_pt handler);
 
-    ngx_int_t  (*process_events)(ngx_cycle_t *cycle, ngx_msec_t timer,
+    ngx_int_t  (*process_events)(ngx_cycle_t *cycle, ngx_msec_t timer, // 正常工作流程中，进行事件的分发处理
                                  ngx_uint_t flags);
 
-    ngx_int_t  (*init)(ngx_cycle_t *cycle, ngx_msec_t timer);
-    void       (*done)(ngx_cycle_t *cycle);
+    ngx_int_t  (*init)(ngx_cycle_t *cycle, ngx_msec_t timer); // 初始化事件驱动
+    void       (*done)(ngx_cycle_t *cycle); // 退出事件驱动调用的方法
 } ngx_event_actions_t;
 
 
@@ -427,15 +427,14 @@ extern ngx_os_io_t  ngx_io;
 
 
 typedef struct {
-    ngx_uint_t    connections;
-    ngx_uint_t    use;
+    ngx_uint_t    connections; // 一个worker支持的连接池数目，worker_connections指令设定，ngx_event_connections函数设置
+    ngx_uint_t    use; // use epoll ngx_event_use函数指定
+    ngx_flag_t    multi_accept; // 尽可能多地accept
+    ngx_flag_t    accept_mutex; // accept时使用mutex锁
 
-    ngx_flag_t    multi_accept;
-    ngx_flag_t    accept_mutex;
+    ngx_msec_t    accept_mutex_delay; // 使用mutex冲突后的延迟
 
-    ngx_msec_t    accept_mutex_delay;
-
-    u_char       *name;
+    u_char       *name; // 所选事件模块的名称
 
 #if (NGX_DEBUG)
     ngx_array_t   debug_connection;
@@ -446,8 +445,8 @@ typedef struct {
 typedef struct {
     ngx_str_t              *name;
 
-    void                 *(*create_conf)(ngx_cycle_t *cycle);
-    char                 *(*init_conf)(ngx_cycle_t *cycle, void *conf);
+    void                 *(*create_conf)(ngx_cycle_t *cycle);  // 解析配置前，这个函数用于创建存储配置的结构体
+    char                 *(*init_conf)(ngx_cycle_t *cycle, void *conf); // 解析配置后，该函数被调用，用于处理感兴趣的配置项
 
     ngx_event_actions_t     actions;
 } ngx_event_module_t;
