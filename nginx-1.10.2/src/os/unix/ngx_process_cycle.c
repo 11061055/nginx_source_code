@@ -35,19 +35,19 @@ ngx_pid_t     ngx_pid;
 sig_atomic_t  ngx_reap;
 sig_atomic_t  ngx_sigio;
 sig_atomic_t  ngx_sigalrm;
-sig_atomic_t  ngx_terminate;
-sig_atomic_t  ngx_quit;
+sig_atomic_t  ngx_terminate;      // TERM信号  强制退出
+sig_atomic_t  ngx_quit;           // QUIT信号  优雅地退出进程
 sig_atomic_t  ngx_debug_quit;
 ngx_uint_t    ngx_exiting;
-sig_atomic_t  ngx_reconfigure;
-sig_atomic_t  ngx_reopen;
+sig_atomic_t  ngx_reconfigure;    // 重读配置文件
+sig_atomic_t  ngx_reopen;         // USR1信号  重开配置文件
 
 sig_atomic_t  ngx_change_binary;
-ngx_pid_t     ngx_new_binary;
+ngx_pid_t     ngx_new_binary;     // USR2信号  重新打开二进制文件
 ngx_uint_t    ngx_inherited;
 ngx_uint_t    ngx_daemonized;
 
-sig_atomic_t  ngx_noaccept;
+sig_atomic_t  ngx_noaccept;       // 各个子进程不再接收新的连接
 ngx_uint_t    ngx_noaccepting;
 ngx_uint_t    ngx_restart;
 
@@ -85,18 +85,18 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
     ngx_core_conf_t   *ccf;
 
     sigemptyset(&set);
-    sigaddset(&set, SIGCHLD);
-    sigaddset(&set, SIGALRM);
-    sigaddset(&set, SIGIO);
-    sigaddset(&set, SIGINT);
-    sigaddset(&set, ngx_signal_value(NGX_RECONFIGURE_SIGNAL));
-    sigaddset(&set, ngx_signal_value(NGX_REOPEN_SIGNAL));
-    sigaddset(&set, ngx_signal_value(NGX_NOACCEPT_SIGNAL));
-    sigaddset(&set, ngx_signal_value(NGX_TERMINATE_SIGNAL));
-    sigaddset(&set, ngx_signal_value(NGX_SHUTDOWN_SIGNAL));
-    sigaddset(&set, ngx_signal_value(NGX_CHANGEBIN_SIGNAL));
+    sigaddset(&set, SIGCHLD); // 子进程退出发送
+    sigaddset(&set, SIGALRM); // alarm超时则产生SIGALRM信号
+    sigaddset(&set, SIGIO); // reload时，Nginx 接收到SIGIO信号
+    sigaddset(&set, SIGINT); // 终止信号 Ctrl-C
+    sigaddset(&set, ngx_signal_value(NGX_RECONFIGURE_SIGNAL)); // HUP
+    sigaddset(&set, ngx_signal_value(NGX_REOPEN_SIGNAL)); // USR1
+    sigaddset(&set, ngx_signal_value(NGX_NOACCEPT_SIGNAL)); // WINCH
+    sigaddset(&set, ngx_signal_value(NGX_TERMINATE_SIGNAL)); // TERM
+    sigaddset(&set, ngx_signal_value(NGX_SHUTDOWN_SIGNAL)); // QUIT
+    sigaddset(&set, ngx_signal_value(NGX_CHANGEBIN_SIGNAL)); // USR2
 
-    if (sigprocmask(SIG_BLOCK, &set, NULL) == -1) {
+    if (sigprocmask(SIG_BLOCK, &set, NULL) == -1) { // 将set所指向的信号集中包含的信号加到当前的信号掩码中。即信号掩码和set信号集进行或操作。
         ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
                       "sigprocmask() failed");
     }
@@ -115,7 +115,7 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
         /* fatal */
         exit(2);
     }
-
+    // 保存 参数和 master process 信息
     p = ngx_cpymem(title, master_process, sizeof(master_process) - 1);
     for (i = 0; i < ngx_argc; i++) {
         *p++ = ' ';
@@ -128,7 +128,7 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
     ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
 
     ngx_start_worker_processes(cycle, ccf->worker_processes,
-                               NGX_PROCESS_RESPAWN);
+                               NGX_PROCESS_RESPAWN); // 启动各个worker子进程，并进入处理请求的大循环
     ngx_start_cache_manager_processes(cycle, 0);
 
     ngx_new_binary = 0;
@@ -136,7 +136,7 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
     sigio = 0;
     live = 1;
 
-    for ( ;; ) {
+    for ( ;; ) { // master 也是在大循环中进行
         if (delay) {
             if (ngx_sigalrm) {
                 sigio = 0;
@@ -171,13 +171,14 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
             ngx_reap = 0;
             ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "reap children");
 
-            live = ngx_reap_children(cycle);
+            live = ngx_reap_children(cycle); // 重启回收worker子进程
         }
 
         if (!live && (ngx_terminate || ngx_quit)) {
             ngx_master_process_exit(cycle);
         }
 
+        // 向子进程发送消息。如果是 terminate shutdown reopen 则通过channel发送，否则通过kill发送
         if (ngx_terminate) {
             if (delay == 0) {
                 delay = 50;
@@ -342,27 +343,34 @@ ngx_single_process_cycle(ngx_cycle_t *cycle)
 
 
 static void
-ngx_start_worker_processes(ngx_cycle_t *cycle, ngx_int_t n, ngx_int_t type)
+ngx_start_worker_processes(ngx_cycle_t *cycle, ngx_int_t n, ngx_int_t type) // 启动worker
 {
     ngx_int_t      i;
     ngx_channel_t  ch;
-
+/*
+typedef struct {
+    ngx_uint_t  command;
+    ngx_pid_t   pid;
+    ngx_int_t   slot;
+    ngx_fd_t    fd;
+} ngx_channel_t;
+*/
     ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "start worker processes");
 
     ngx_memzero(&ch, sizeof(ngx_channel_t));
 
-    ch.command = NGX_CMD_OPEN_CHANNEL;
+    ch.command = NGX_CMD_OPEN_CHANNEL; // 1
 
     for (i = 0; i < n; i++) {
 
         ngx_spawn_process(cycle, ngx_worker_process_cycle,
-                          (void *) (intptr_t) i, "worker process", type);
+                          (void *) (intptr_t) i, "worker process", type); // 每个worker进程启动时都执行ngx_worker_process_cycle
 
         ch.pid = ngx_processes[ngx_process_slot].pid;
         ch.slot = ngx_process_slot;
         ch.fd = ngx_processes[ngx_process_slot].channel[0];
 
-        ngx_pass_open_channel(cycle, &ch);
+        ngx_pass_open_channel(cycle, &ch); // 将新worker进程通知给所有已存在worker进程
     }
 }
 
@@ -552,7 +560,7 @@ ngx_signal_worker_processes(ngx_cycle_t *cycle, int signo)
     }
 }
 
-
+// 重启回收worker子进程
 static ngx_uint_t
 ngx_reap_children(ngx_cycle_t *cycle)
 {
@@ -724,21 +732,21 @@ ngx_master_process_exit(ngx_cycle_t *cycle)
 
 
 static void
-ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
+ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data) // 每个worker启动的时候都执行该函数
 {
     ngx_int_t worker = (intptr_t) data;
 
     ngx_process = NGX_PROCESS_WORKER;
     ngx_worker = worker;
 
-    ngx_worker_process_init(cycle, worker);
+    ngx_worker_process_init(cycle, worker); // // 初始化 worker 比如设置优先级 CPU亲和性 文件数限制 以及 每个 module 的 init_process
 
     ngx_setproctitle("worker process");
 
-    for ( ;; ) {
+    for ( ;; ) { // 进入大循环
 
-        if (ngx_exiting) {
-            ngx_event_cancel_timers();
+        if (ngx_exiting) { // 退出
+            ngx_event_cancel_timers(); // 删除所有定时器 并且回调各自的handler
 
             if (ngx_event_timer_rbtree.root == ngx_event_timer_rbtree.sentinel)
             {
@@ -750,15 +758,15 @@ ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
 
         ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "worker cycle");
 
-        ngx_process_events_and_timers(cycle);
+        ngx_process_events_and_timers(cycle); // 循环 做 实际 工作的地方
 
-        if (ngx_terminate) {
+        if (ngx_terminate) { // 直接退出
             ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "exiting");
 
             ngx_worker_process_exit(cycle);
         }
 
-        if (ngx_quit) {
+        if (ngx_quit) { // 平滑退出
             ngx_quit = 0;
             ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0,
                           "gracefully shutting down");
@@ -771,7 +779,7 @@ ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
             }
         }
 
-        if (ngx_reopen) {
+        if (ngx_reopen) { // 重新打开配置文件
             ngx_reopen = 0;
             ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "reopening logs");
             ngx_reopen_files(cycle, -1);
@@ -779,7 +787,7 @@ ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
     }
 }
 
-
+// 初始化 worker 比如设置优先级 CPU亲和性 文件数限制
 static void
 ngx_worker_process_init(ngx_cycle_t *cycle, ngx_int_t worker)
 {
@@ -877,7 +885,7 @@ ngx_worker_process_init(ngx_cycle_t *cycle, ngx_int_t worker)
         }
     }
 
-    sigemptyset(&set);
+    sigemptyset(&set); // 禁用所有的信号
 
     if (sigprocmask(SIG_SETMASK, &set, NULL) == -1) {
         ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
@@ -942,7 +950,7 @@ ngx_worker_process_init(ngx_cycle_t *cycle, ngx_int_t worker)
     }
 }
 
-
+// 直接退出
 static void
 ngx_worker_process_exit(ngx_cycle_t *cycle)
 {

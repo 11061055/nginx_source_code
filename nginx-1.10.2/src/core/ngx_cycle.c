@@ -32,7 +32,7 @@ ngx_uint_t             ngx_quiet_mode;
 static ngx_connection_t  dumb;
 /* STUB */
 
-
+// main han
 ngx_cycle_t *
 ngx_init_cycle(ngx_cycle_t *old_cycle)
 {
@@ -64,7 +64,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 
     log = old_cycle->log;
 
-    pool = ngx_create_pool(NGX_CYCLE_POOL_SIZE, log);
+    pool = ngx_create_pool(NGX_CYCLE_POOL_SIZE, log); // 单次只能申请NGX_CYCLE_POOL_SIZE大小的内存池单元
     if (pool == NULL) {
         return NULL;
     }
@@ -212,14 +212,14 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
     ngx_strlow(cycle->hostname.data, (u_char *) hostname, cycle->hostname.len);
 
 
-    if (ngx_cycle_modules(cycle) != NGX_OK) {
+    if (ngx_cycle_modules(cycle) != NGX_OK) { // 将所有 struct ngx_module_s 结构保存到 cycle 中 去
         ngx_destroy_pool(pool);
         return NULL;
     }
 
 
     for (i = 0; cycle->modules[i]; i++) {
-        if (cycle->modules[i]->type != NGX_CORE_MODULE) {
+        if (cycle->modules[i]->type != NGX_CORE_MODULE) { // 初始化只处理core模块相关的所有模块
             continue;
         }
 
@@ -289,7 +289,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 
         module = cycle->modules[i]->ctx;
 
-        if (module->init_conf) {
+        if (module->init_conf) { // 调用各个模块的init_conf以初始化各个模块的配置
             if (module->init_conf(cycle,
                                   cycle->conf_ctx[cycle->modules[i]->index])
                 == NGX_CONF_ERROR)
@@ -402,7 +402,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 
     /* create shared memory */
 
-    part = &cycle->shared_memory.part;
+    part = &cycle->shared_memory.part; // 链表结构
     shm_zone = part->elts;
 
     for (i = 0; /* void */ ; i++) {
@@ -411,7 +411,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
             if (part->next == NULL) {
                 break;
             }
-            part = part->next;
+            part = part->next; // 指向下一个
             shm_zone = part->elts;
             i = 0;
         }
@@ -455,7 +455,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
                 && shm_zone[i].shm.size == oshm_zone[n].shm.size
                 && !shm_zone[i].noreuse)
             {
-                shm_zone[i].shm.addr = oshm_zone[n].shm.addr;
+                shm_zone[i].shm.addr = oshm_zone[n].shm.addr; // 把 老的 赋给 新的
 #if (NGX_WIN32)
                 shm_zone[i].shm.handle = oshm_zone[n].shm.handle;
 #endif
@@ -494,16 +494,16 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 
     /* handle the listening sockets */
 
-    if (old_cycle->listening.nelts) {
+    if (old_cycle->listening.nelts) { // 把老cycle中的套接字拷贝到新的cycle中
         ls = old_cycle->listening.elts;
         for (i = 0; i < old_cycle->listening.nelts; i++) {
-            ls[i].remain = 0;
+            ls[i].remain = 0; // 为0不保留原有套接字
         }
 
         nls = cycle->listening.elts;
-        for (n = 0; n < cycle->listening.nelts; n++) {
+        for (n = 0; n < cycle->listening.nelts; n++) { // 遍历所有新的套接字
 
-            for (i = 0; i < old_cycle->listening.nelts; i++) {
+            for (i = 0; i < old_cycle->listening.nelts; i++) { // 在老的套接字中查找
                 if (ls[i].ignore) {
                     continue;
                 }
@@ -517,7 +517,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
                 }
 
                 if (ngx_cmp_sockaddr(nls[n].sockaddr, nls[n].socklen,
-                                     ls[i].sockaddr, ls[i].socklen, 1)
+                                     ls[i].sockaddr, ls[i].socklen, 1) // 如果两个套接字相等则将旧套接字的属性设置到新套接字中
                     == NGX_OK)
                 {
                     nls[n].fd = ls[i].fd;
@@ -606,23 +606,24 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
         }
     }
 
-    if (ngx_open_listening_sockets(cycle) != NGX_OK) {
+    if (ngx_open_listening_sockets(cycle) != NGX_OK) { // 创建 并且监听套接字
         goto failed;
     }
 
     if (!ngx_test_config) {
-        ngx_configure_listening_sockets(cycle);
+        ngx_configure_listening_sockets(cycle); // 设置套接字选项 比如 buffer 大小，TCP KEEPALIVE选项等
     }
 
 
     /* commit the new cycle configuration */
 
     if (!ngx_use_stderr) {
-        (void) ngx_log_redirect_stderr(cycle);
+        (void) ngx_log_redirect_stderr(cycle); // 标准错误重定向
     }
 
     pool->log = cycle->log;
 
+    // 上面每个模块 create_conf 之后再 init_conf 这里每个模块再 init_module
     if (ngx_init_modules(cycle) != NGX_OK) {
         /* fatal */
         exit(1);
@@ -636,7 +637,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
     opart = &old_cycle->shared_memory.part;
     oshm_zone = opart->elts;
 
-    for (i = 0; /* void */ ; i++) {
+    for (i = 0; /* void */ ; i++) { // 处理共享内存 遍历老的cycle
 
         if (i >= opart->nelts) {
             if (opart->next == NULL) {
@@ -650,7 +651,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
         part = &cycle->shared_memory.part;
         shm_zone = part->elts;
 
-        for (n = 0; /* void */ ; n++) {
+        for (n = 0; /* void */ ; n++) { // 对每个老的 遍历新的cycle中的共享内存
 
             if (n >= part->nelts) {
                 if (part->next == NULL) {
@@ -664,14 +665,14 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
             if (oshm_zone[i].shm.name.len == shm_zone[n].shm.name.len
                 && ngx_strncmp(oshm_zone[i].shm.name.data,
                                shm_zone[n].shm.name.data,
-                               oshm_zone[i].shm.name.len)
+                               oshm_zone[i].shm.name.len) // 如果找到相等的则不释放共享老的共享内存
                 == 0)
             {
                 goto live_shm_zone;
             }
         }
 
-        ngx_shm_free(&oshm_zone[i].shm);
+        ngx_shm_free(&oshm_zone[i].shm); // 否则就释放老的共享内存
 
     live_shm_zone:
 
@@ -684,7 +685,7 @@ old_shm_zone_done:
     /* close the unnecessary listening sockets */
 
     ls = old_cycle->listening.elts;
-    for (i = 0; i < old_cycle->listening.nelts; i++) {
+    for (i = 0; i < old_cycle->listening.nelts; i++) { // 关闭老的cycle中不必要的套接字
 
         if (ls[i].remain || ls[i].fd == (ngx_socket_t) -1) {
             continue;
@@ -721,7 +722,7 @@ old_shm_zone_done:
     part = &old_cycle->open_files.part;
     file = part->elts;
 
-    for (i = 0; /* void */ ; i++) {
+    for (i = 0; /* void */ ; i++) { // 关闭老的cycle中不必要的文件
 
         if (i >= part->nelts) {
             if (part->next == NULL) {
@@ -765,7 +766,7 @@ old_shm_zone_done:
     }
 
 
-    if (ngx_temp_pool == NULL) {
+    if (ngx_temp_pool == NULL) { // 开辟临时内存池
         ngx_temp_pool = ngx_create_pool(128, cycle->log);
         if (ngx_temp_pool == NULL) {
             ngx_log_error(NGX_LOG_EMERG, cycle->log, 0,
@@ -773,7 +774,7 @@ old_shm_zone_done:
             exit(1);
         }
 
-        n = 10;
+        n = 10; // 开辟一个大小为10的数组来保存老的cycle
         ngx_old_cycles.elts = ngx_pcalloc(ngx_temp_pool,
                                           n * sizeof(ngx_cycle_t *));
         if (ngx_old_cycles.elts == NULL) {
@@ -784,9 +785,9 @@ old_shm_zone_done:
         ngx_old_cycles.nalloc = n;
         ngx_old_cycles.pool = ngx_temp_pool;
 
-        ngx_cleaner_event.handler = ngx_clean_old_cycles;
+        ngx_cleaner_event.handler = ngx_clean_old_cycles; // 回收老的cycle的定时器
         ngx_cleaner_event.log = cycle->log;
-        ngx_cleaner_event.data = &dumb;
+        ngx_cleaner_event.data = &dumb; // static ngx_connection_t  dumb;
         dumb.fd = (ngx_socket_t) -1;
     }
 
@@ -796,10 +797,10 @@ old_shm_zone_done:
     if (old == NULL) {
         exit(1);
     }
-    *old = old_cycle;
+    *old = old_cycle; // 保存老的cycle
 
     if (!ngx_cleaner_event.timer_set) {
-        ngx_add_timer(&ngx_cleaner_event, 30000);
+        ngx_add_timer(&ngx_cleaner_event, 30000); // 增加定时器，30秒后回收老的cycle
         ngx_cleaner_event.timer_set = 1;
     }
 
@@ -911,8 +912,8 @@ ngx_init_zone_pool(ngx_cycle_t *cycle, ngx_shm_zone_t *zn)
         return NGX_ERROR;
     }
 
-    sp->end = zn->shm.addr + zn->shm.size;
-    sp->min_shift = 3;
+    sp->end = zn->shm.addr + zn->shm.size; // 设置内存管理器的结束位置
+    sp->min_shift = 3; // 最小分配单元
     sp->addr = zn->shm.addr;
 
 #if (NGX_HAVE_ATOMIC_OPS)
@@ -1003,7 +1004,7 @@ ngx_delete_pidfile(ngx_cycle_t *cycle)
 
 
 ngx_int_t
-ngx_signal_process(ngx_cycle_t *cycle, char *sig)
+ngx_signal_process(ngx_cycle_t *cycle, char *sig) // // 对所有的 sig 调用 kill(pid, sig->signo)
 {
     ssize_t           n;
     ngx_pid_t         pid;
@@ -1013,7 +1014,7 @@ ngx_signal_process(ngx_cycle_t *cycle, char *sig)
 
     ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "signal process started");
 
-    ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
+    ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module); // 获取到一个ngx_core_conf_t结构体
 
     ngx_memzero(&file, sizeof(ngx_file_t));
 
@@ -1051,7 +1052,7 @@ ngx_signal_process(ngx_cycle_t *cycle, char *sig)
         return 1;
     }
 
-    return ngx_os_signal_process(cycle, sig, pid);
+    return ngx_os_signal_process(cycle, sig, pid); // 对所有的 sig 调用 kill(pid, sig->signo)
 
 }
 
@@ -1310,7 +1311,7 @@ ngx_clean_old_cycles(ngx_event_t *ev)
         found = 0;
 
         for (n = 0; n < cycle[i]->connection_n; n++) {
-            if (cycle[i]->connections[n].fd != (ngx_socket_t) -1) {
+            if (cycle[i]->connections[n].fd != (ngx_socket_t) -1) { // 如果有一个连接还是存活的，则老的cycle不会被释放掉
                 found = 1;
 
                 ngx_log_debug1(NGX_LOG_DEBUG_CORE, log, 0, "live fd:%ui", n);

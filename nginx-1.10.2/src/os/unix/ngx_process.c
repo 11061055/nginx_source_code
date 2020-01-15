@@ -114,7 +114,7 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
 
         /* Solaris 9 still has no AF_LOCAL */
 
-        if (socketpair(AF_UNIX, SOCK_STREAM, 0, ngx_processes[s].channel) == -1)
+        if (socketpair(AF_UNIX, SOCK_STREAM, 0, ngx_processes[s].channel) == -1) // 创建套接字对用于进程间通信
         {
             ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
                           "socketpair() failed while spawning \"%s\"", name);
@@ -126,7 +126,7 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
                        ngx_processes[s].channel[0],
                        ngx_processes[s].channel[1]);
 
-        if (ngx_nonblocking(ngx_processes[s].channel[0]) == -1) {
+        if (ngx_nonblocking(ngx_processes[s].channel[0]) == -1) { // 设置为非阻塞
             ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
                           ngx_nonblocking_n " failed while spawning \"%s\"",
                           name);
@@ -143,21 +143,21 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
         }
 
         on = 1;
-        if (ioctl(ngx_processes[s].channel[0], FIOASYNC, &on) == -1) {
+        if (ioctl(ngx_processes[s].channel[0], FIOASYNC, &on) == -1) { // 该标记决定fd可以IO时进程是否会收到SIGIO信号
             ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
                           "ioctl(FIOASYNC) failed while spawning \"%s\"", name);
             ngx_close_channel(ngx_processes[s].channel, cycle->log);
             return NGX_INVALID_PID;
         }
 
-        if (fcntl(ngx_processes[s].channel[0], F_SETOWN, ngx_pid) == -1) {
+        if (fcntl(ngx_processes[s].channel[0], F_SETOWN, ngx_pid) == -1) { // //Master process to receive SIGIO signals
             ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
                           "fcntl(F_SETOWN) failed while spawning \"%s\"", name);
             ngx_close_channel(ngx_processes[s].channel, cycle->log);
             return NGX_INVALID_PID;
         }
 
-        if (fcntl(ngx_processes[s].channel[0], F_SETFD, FD_CLOEXEC) == -1) {
+        if (fcntl(ngx_processes[s].channel[0], F_SETFD, FD_CLOEXEC) == -1) { // 在子进程中该描述符号将被关闭
             ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
                           "fcntl(FD_CLOEXEC) failed while spawning \"%s\"",
                            name);
@@ -183,7 +183,7 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
     ngx_process_slot = s;
 
 
-    pid = fork();
+    pid = fork(); // 创建子进程
 
     switch (pid) {
 
@@ -195,7 +195,7 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
 
     case 0:
         ngx_pid = ngx_getpid();
-        proc(cycle, data);
+        proc(cycle, data); // 执行子进程
         break;
 
     default:

@@ -21,18 +21,18 @@ typedef void (*ngx_spawn_proc_pt) (ngx_cycle_t *cycle, void *data);
 
 typedef struct {
     ngx_pid_t           pid;
-    int                 status;
-    ngx_socket_t        channel[2];
+    int                 status; // waitpid 获取到的进程状态
+    ngx_socket_t        channel[2]; // 父子之间的通信方式
 
     ngx_spawn_proc_pt   proc;
-    void               *data;
+    void               *data; // ngx_spawn_process 的第二个参数
     char               *name;
 
-    unsigned            respawn:1;
-    unsigned            just_spawn:1;
-    unsigned            detached:1;
-    unsigned            exiting:1;
-    unsigned            exited:1;
+    unsigned            respawn:1; // 正在重新生成子进程
+    unsigned            just_spawn:1; // 正在生成子进程
+    unsigned            detached:1; // 正在进行父子进程分离
+    unsigned            exiting:1; // 正在退出
+    unsigned            exited:1; // 已经退出
 } ngx_process_t;
 
 
@@ -82,7 +82,7 @@ extern ngx_pid_t      ngx_pid;
 extern ngx_socket_t   ngx_channel;
 extern ngx_int_t      ngx_process_slot;
 extern ngx_int_t      ngx_last_process;
-extern ngx_process_t  ngx_processes[NGX_MAX_PROCESSES];
+extern ngx_process_t  ngx_processes[NGX_MAX_PROCESSES]; // 所有worker子进程
 
 
 #endif /* _NGX_PROCESS_H_INCLUDED_ */

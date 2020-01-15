@@ -199,7 +199,7 @@ main(int argc, char *const *argv)
         return 1;
     }
 
-    if (ngx_get_options(argc, argv) != NGX_OK) {
+    if (ngx_get_options(argc, argv) != NGX_OK) { // 解析所有的参数
         return 1;
     }
 
@@ -240,7 +240,7 @@ main(int argc, char *const *argv)
     init_cycle.log = log;
     ngx_cycle = &init_cycle;
 
-    init_cycle.pool = ngx_create_pool(1024, log);
+    init_cycle.pool = ngx_create_pool(1024, log); // 申请 pool， 指定了一次从内存池分配最大的内存为1K
     if (init_cycle.pool == NULL) {
         return 1;
     }
@@ -269,11 +269,11 @@ main(int argc, char *const *argv)
         return 1;
     }
 
-    if (ngx_preinit_modules() != NGX_OK) {
+    if (ngx_preinit_modules() != NGX_OK) { // 初始化模块的 index 和 name
         return 1;
     }
 
-    cycle = ngx_init_cycle(&init_cycle);
+    cycle = ngx_init_cycle(&init_cycle); // 更换成新的 cycle
     if (cycle == NULL) {
         if (ngx_test_config) {
             ngx_log_stderr(0, "configuration file %s test failed",
@@ -310,7 +310,7 @@ main(int argc, char *const *argv)
     }
 
     if (ngx_signal) {
-        return ngx_signal_process(cycle, ngx_signal);
+        return ngx_signal_process(cycle, ngx_signal); // 向nginx进程发送信号 kill(pid, sig->signo)
     }
 
     ngx_os_status(cycle->log);
@@ -361,10 +361,10 @@ main(int argc, char *const *argv)
     ngx_use_stderr = 0;
 
     if (ngx_process == NGX_PROCESS_SINGLE) {
-        ngx_single_process_cycle(cycle);
+        ngx_single_process_cycle(cycle); // 单进程模式，建议先看这个最简单
 
     } else {
-        ngx_master_process_cycle(cycle);
+        ngx_master_process_cycle(cycle); // master worker 模式 启动 master worker 各自的主循环
     }
 
     return 0;
@@ -432,7 +432,7 @@ ngx_show_version_info(void)
     }
 }
 
-
+// 设置需要继承的套接字 用于 平滑 重启
 static ngx_int_t
 ngx_add_inherited_sockets(ngx_cycle_t *cycle)
 {
@@ -440,7 +440,7 @@ ngx_add_inherited_sockets(ngx_cycle_t *cycle)
     ngx_int_t         s;
     ngx_listening_t  *ls;
 
-    inherited = (u_char *) getenv(NGINX_VAR);
+    inherited = (u_char *) getenv(NGINX_VAR); // 环境变量中保存了需要继承的套接字
 
     if (inherited == NULL) {
         return NGX_OK;
@@ -455,7 +455,7 @@ ngx_add_inherited_sockets(ngx_cycle_t *cycle)
     {
         return NGX_ERROR;
     }
-
+    // 以 : 或者 ; 分隔
     for (p = inherited, v = p; *p; p++) {
         if (*p == ':' || *p == ';') {
             s = ngx_atoi(v, p - v);
@@ -469,14 +469,14 @@ ngx_add_inherited_sockets(ngx_cycle_t *cycle)
 
             v = p + 1;
 
-            ls = ngx_array_push(&cycle->listening);
+            ls = ngx_array_push(&cycle->listening); // 加入到 数组中去
             if (ls == NULL) {
                 return NGX_ERROR;
             }
 
             ngx_memzero(ls, sizeof(ngx_listening_t));
 
-            ls->fd = (ngx_socket_t) s;
+            ls->fd = (ngx_socket_t) s; // 保存继承到的套接字
         }
     }
 
@@ -819,7 +819,7 @@ ngx_get_options(int argc, char *const *argv)
     return NGX_OK;
 }
 
-
+// 保存启动参数，main函数中调用
 static ngx_int_t
 ngx_save_argv(ngx_cycle_t *cycle, int argc, char *const *argv)
 {
@@ -930,7 +930,7 @@ ngx_process_options(ngx_cycle_t *cycle)
         ngx_str_set(&cycle->conf_file, NGX_CONF_PATH);
     }
 
-    if (ngx_conf_full_name(cycle, &cycle->conf_file, 0) != NGX_OK) {
+    if (ngx_conf_full_name(cycle, &cycle->conf_file, 0) != NGX_OK) { // 获取全路径名称
         return NGX_ERROR;
     }
 
