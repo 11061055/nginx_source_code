@@ -20,7 +20,7 @@ static void ngx_debug_accepted_connection(ngx_event_conf_t *ecf,
 
 
 void
-ngx_event_accept(ngx_event_t *ev)
+ngx_event_accept(ngx_event_t *ev) // accept新连接ngx_event_process_init中设置为事件处理器
 {
     socklen_t          socklen;
     ngx_err_t          err;
@@ -43,15 +43,15 @@ ngx_event_accept(ngx_event_t *ev)
 
         ev->timedout = 0;
     }
-
+    // 获取ngx_event_core_module模块的配置项参数结构
     ecf = ngx_event_get_conf(ngx_cycle->conf_ctx, ngx_event_core_module);
 
     if (!(ngx_event_flags & NGX_USE_KQUEUE_EVENT)) {
         ev->available = ecf->multi_accept;
     }
 
-    lc = ev->data;
-    ls = lc->listening;
+    lc = ev->data; // 一个ngx_connection_t对象
+    ls = lc->listening; // 保存有fd数组和相关配置参数
     ev->ready = 0;
 
     ngx_log_debug2(NGX_LOG_DEBUG_EVENT, ev->log, 0,
@@ -65,13 +65,13 @@ ngx_event_accept(ngx_event_t *ev)
             s = accept4(lc->fd, (struct sockaddr *) sa, &socklen,
                         SOCK_NONBLOCK);
         } else {
-            s = accept(lc->fd, (struct sockaddr *) sa, &socklen);
+            s = accept(lc->fd, (struct sockaddr *) sa, &socklen); // accpet一个连接
         }
 #else
         s = accept(lc->fd, (struct sockaddr *) sa, &socklen);
 #endif
 
-        if (s == (ngx_socket_t) -1) {
+        if (s == (ngx_socket_t) -1) { // 没有accept成功
             err = ngx_socket_errno;
 
             if (err == NGX_EAGAIN) {
@@ -112,14 +112,14 @@ ngx_event_accept(ngx_event_t *ev)
                 }
             }
 
-            if (err == NGX_EMFILE || err == NGX_ENFILE) {
-                if (ngx_disable_accept_events((ngx_cycle_t *) ngx_cycle, 1)
+            if (err == NGX_EMFILE || err == NGX_ENFILE) { // 打开文件过多
+                if (ngx_disable_accept_events((ngx_cycle_t *) ngx_cycle, 1) // 注销读事件，实际调用的是 ngx_del_event(c->read, NGX_READ_EVENT, NGX_DISABLE_EVENT)
                     != NGX_OK)
                 {
                     return;
                 }
 
-                if (ngx_use_accept_mutex) {
+                if (ngx_use_accept_mutex) { // accept成功释放锁
                     if (ngx_accept_mutex_held) {
                         ngx_shmtx_unlock(&ngx_accept_mutex);
                         ngx_accept_mutex_held = 0;
@@ -128,21 +128,23 @@ ngx_event_accept(ngx_event_t *ev)
                     ngx_accept_disabled = 1;
 
                 } else {
-                    ngx_add_timer(ev, ecf->accept_mutex_delay);
+                    ngx_add_timer(ev, ecf->accept_mutex_delay); // 否则注册延迟，之后再调用accept
                 }
             }
 
             return;
         }
 
+        // accept成功了
+
 #if (NGX_STAT_STUB)
-        (void) ngx_atomic_fetch_add(ngx_stat_accepted, 1);
+        (void) ngx_atomic_fetch_add(ngx_stat_accepted, 1); // 增加stat计数器
 #endif
 
         ngx_accept_disabled = ngx_cycle->connection_n / 8
-                              - ngx_cycle->free_connection_n;
+                              - ngx_cycle->free_connection_n; // 当每个进程最大连接数的八分之一减去空闲连接数大于0时，表示连接数过多，即空闲连接过小时，将被禁止accept
 
-        c = ngx_get_connection(s, ev->log);
+        c = ngx_get_connection(s, ev->log); // 获取一个连接对象
 
         if (c == NULL) {
             if (ngx_close_socket(s) == -1) {
@@ -159,12 +161,12 @@ ngx_event_accept(ngx_event_t *ev)
         (void) ngx_atomic_fetch_add(ngx_stat_active, 1);
 #endif
 
-        c->pool = ngx_create_pool(ls->pool_size, ev->log);
+        c->pool = ngx_create_pool(ls->pool_size, ev->log); // 每个连接fd创建一个pool
         if (c->pool == NULL) {
             ngx_close_accepted_connection(c);
             return;
         }
-
+        // 下面开始初始化
         c->sockaddr = ngx_palloc(c->pool, socklen);
         if (c->sockaddr == NULL) {
             ngx_close_accepted_connection(c);
@@ -182,7 +184,7 @@ ngx_event_accept(ngx_event_t *ev)
         /* set a blocking mode for iocp and non-blocking mode for others */
 
         if (ngx_inherited_nonblocking) {
-            if (ngx_event_flags & NGX_USE_IOCP_EVENT) {
+            if (ngx_event_flags & NGX_USE_IOCP_EVENT) { // 设置为非阻塞
                 if (ngx_blocking(s) == -1) {
                     ngx_log_error(NGX_LOG_ALERT, ev->log, ngx_socket_errno,
                                   ngx_blocking_n " failed");
@@ -308,7 +310,7 @@ ngx_event_accept(ngx_event_t *ev)
 
         log->data = NULL;
         log->handler = NULL;
-
+        // ngx_http_init_connection
         ls->handler(c);
 
         if (ngx_event_flags & NGX_USE_KQUEUE_EVENT) {
@@ -322,7 +324,7 @@ ngx_event_accept(ngx_event_t *ev)
 #if !(NGX_WIN32)
 
 void
-ngx_event_recvmsg(ngx_event_t *ev)
+ngx_event_recvmsg(ngx_event_t *ev) // ngx_event_process_init中设置为事件处理器，用于接收UDP数据
 {
     ssize_t            n;
     ngx_log_t         *log;
@@ -351,7 +353,7 @@ ngx_event_recvmsg(ngx_event_t *ev)
 #endif
 
     if (ev->timedout) {
-        if (ngx_enable_accept_events((ngx_cycle_t *) ngx_cycle) != NGX_OK) {
+        if (ngx_enable_accept_events((ngx_cycle_t *) ngx_cycle) != NGX_OK) { // 对cycle中的所有listen结构体调用ngx_add_event(c->read, NGX_READ_EVENT, 0)加入可读事件队列
             return;
         }
 
@@ -364,7 +366,7 @@ ngx_event_recvmsg(ngx_event_t *ev)
         ev->available = ecf->multi_accept;
     }
 
-    lc = ev->data;
+    lc = ev->data; // 获取一个ngx_connection_t结构体
     ls = lc->listening;
     ev->ready = 0;
 
@@ -555,7 +557,7 @@ ngx_event_recvmsg(ngx_event_t *ev)
 
 #endif
 
-        c->buffer = ngx_create_temp_buf(c->pool, n);
+        c->buffer = ngx_create_temp_buf(c->pool, n); // 创建一个buffer
         if (c->buffer == NULL) {
             ngx_close_accepted_connection(c);
             return;
@@ -640,21 +642,21 @@ ngx_event_recvmsg(ngx_event_t *ev)
 ngx_int_t
 ngx_trylock_accept_mutex(ngx_cycle_t *cycle)
 {
-    if (ngx_shmtx_trylock(&ngx_accept_mutex)) {
+    if (ngx_shmtx_trylock(&ngx_accept_mutex)) { // 使用进程间同步锁，试图获取accept_mutex锁。
 
         ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
                        "accept mutex locked");
 
-        if (ngx_accept_mutex_held && ngx_accept_events == 0) {
+        if (ngx_accept_mutex_held && ngx_accept_events == 0) { // 已经获取到锁
             return NGX_OK;
         }
 
-        if (ngx_enable_accept_events(cycle) == NGX_ERROR) {
+        if (ngx_enable_accept_events(cycle) == NGX_ERROR) { // 将所有监听连接的读事件添加到当前的epoll事件驱动模块中 ngx_add_event(c->read, NGX_READ_EVENT, 0)
             ngx_shmtx_unlock(&ngx_accept_mutex);
             return NGX_ERROR;
         }
 
-        ngx_accept_events = 0;
+        ngx_accept_events = 0; // 获取到锁后设置这两个变量
         ngx_accept_mutex_held = 1;
 
         return NGX_OK;
@@ -663,8 +665,8 @@ ngx_trylock_accept_mutex(ngx_cycle_t *cycle)
     ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
                    "accept mutex lock failed: %ui", ngx_accept_mutex_held);
 
-    if (ngx_accept_mutex_held) {
-        if (ngx_disable_accept_events(cycle, 0) == NGX_ERROR) {
+    if (ngx_accept_mutex_held) { // 错误情况
+        if (ngx_disable_accept_events(cycle, 0) == NGX_ERROR) { // 将所有监听连接的读事件从事件驱动模块中移除 ngx_del_event(c->read, NGX_READ_EVENT, NGX_DISABLE_EVENT)
             return NGX_ERROR;
         }
 
@@ -676,7 +678,7 @@ ngx_trylock_accept_mutex(ngx_cycle_t *cycle)
 
 
 static ngx_int_t
-ngx_enable_accept_events(ngx_cycle_t *cycle)
+ngx_enable_accept_events(ngx_cycle_t *cycle) // 将所有监听连接的读事件添加到当前的epoll事件驱动模块中
 {
     ngx_uint_t         i;
     ngx_listening_t   *ls;
@@ -701,7 +703,7 @@ ngx_enable_accept_events(ngx_cycle_t *cycle)
 
 
 static ngx_int_t
-ngx_disable_accept_events(ngx_cycle_t *cycle, ngx_uint_t all)
+ngx_disable_accept_events(ngx_cycle_t *cycle, ngx_uint_t all) // 将所有监听连接的读事件从当前的epoll事件驱动模块中删除
 {
     ngx_uint_t         i;
     ngx_listening_t   *ls;
@@ -745,18 +747,18 @@ ngx_close_accepted_connection(ngx_connection_t *c)
 {
     ngx_socket_t  fd;
 
-    ngx_free_connection(c);
+    ngx_free_connection(c); // 释放连接相关资源
 
     fd = c->fd;
     c->fd = (ngx_socket_t) -1;
 
-    if (!c->shared && ngx_close_socket(fd) == -1) {
+    if (!c->shared && ngx_close_socket(fd) == -1) { // 关闭套接字fd
         ngx_log_error(NGX_LOG_ALERT, c->log, ngx_socket_errno,
                       ngx_close_socket_n " failed");
     }
 
     if (c->pool) {
-        ngx_destroy_pool(c->pool);
+        ngx_destroy_pool(c->pool); // 释放pool
     }
 
 #if (NGX_STAT_STUB)
